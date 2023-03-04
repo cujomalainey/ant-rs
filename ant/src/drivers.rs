@@ -144,7 +144,6 @@ fn parse_buffer<R, W>(buf: &Buffer) -> Result<Option<AntMessage>, DriverError<R,
                 RxMessageType::ChannelResponse(ChannelResponse::unpack_from_slice(msg_slice)?)
             }
         }
-        // TODO replace this with the optional field handling
         RxMessageId::ChannelStatus => {
             RxMessageType::ChannelStatus(ChannelStatus::unpack_from_slice(msg_slice)?)
         }
