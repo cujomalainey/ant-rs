@@ -6,6 +6,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+pub const NETWORK_RF_FREQUENCY: u8 = 57;
+
 pub mod common_datapages;
 pub mod profiles;
 pub mod router;
