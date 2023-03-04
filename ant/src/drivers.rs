@@ -262,14 +262,13 @@ where
 
     fn send_message(&mut self, msg: &dyn AntTxMessageType) -> Result<(), DriverError<R, W>> {
         // TODO update with variable sized buf
-        // TODO add sleep pin handling
         // TODO fix io error propotation
         let mut buf: [u8; ANT_MESSAGE_SIZE] = [0; ANT_MESSAGE_SIZE];
 
         let buf_slice = create_packed_message(&mut buf, msg)?;
 
         if let Some(pin) = &mut self.sleep {
-            // TODO to return type eventually
+            // TODO propogate error
             if pin.set_low().is_err() {
                 return Err(DriverError::PinChangeBug(PinState::Low));
             }
@@ -287,6 +286,7 @@ where
         }
 
         if let Some(pin) = &mut self.sleep {
+            // TODO propogate error
             if pin.set_high().is_err() {
                 return Err(DriverError::PinChangeBug(PinState::High));
             }
@@ -348,6 +348,8 @@ impl<R, W> std::cmp::PartialEq for DriverError<R, W> {
 }
 
 // TODO remove this once https://github.com/rust-lang/rust/issues/35121 is done
+/// This is a Pin type for devices that do not wish to use the pin functions of the drivers, this
+/// includes USB use cases
 pub struct StubPin {}
 
 impl OutputPin for StubPin {
@@ -471,6 +473,11 @@ mod tests {
     fn checksum() {
         let data = [0xA4, 6, 0x59, 2, 0x44, 0x33, 120, 34, 2];
         assert_eq!(calculate_checksum(&data), 214);
+    }
+
+    #[test]
+    fn sleep_pin() {
+        // TODO
     }
 
     #[test]
