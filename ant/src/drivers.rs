@@ -244,9 +244,8 @@ where
             let data = self.serial.read();
             match data {
                 Ok(d) => buf.push(d),
-                // TODO if its not a non blocking error we should propogate it up
-                // return Err(DriverError::IOError { source: e });
-                Err(_) => break,
+                Err(nb::Error::WouldBlock) => break,
+                Err(e) => return Err(DriverError::ReadError(e)),
             }
 
             if buf.is_full() {
