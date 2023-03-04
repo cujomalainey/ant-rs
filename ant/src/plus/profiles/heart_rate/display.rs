@@ -19,7 +19,8 @@ use crate::plus::profiles::heart_rate::{
     ProductInformation, SwimIntervalSummary, DATA_PAGE_NUMBER_MASK,
 };
 use crate::plus::router::{Channel, ChannelError, NetworkKey, Router, RouterError};
-use crate::plus::NETWORK_RF_FREQUENCY;
+use crate::plus::{duration_to_search_timeout, NETWORK_RF_FREQUENCY};
+use core::time::Duration;
 use packed_struct::{PackedStruct, PrimitiveEnum};
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
@@ -96,7 +97,10 @@ impl<R, W, D: Driver<R, W>> HeartRateDisplay<R, W, D> {
             self.transmission_type,
         ); // TODO type devicetype
         let rf = ChannelRfFrequency::new(self.channel, NETWORK_RF_FREQUENCY);
-        let timeout = SearchTimeout::new(self.channel, 12); // TODO add from duration
+        let timeout = SearchTimeout::new(
+            self.channel,
+            duration_to_search_timeout(Duration::from_secs(30)),
+        );
         let open = OpenChannel::new(self.channel);
         router.send(&assign)?;
         router.send(&period)?;
