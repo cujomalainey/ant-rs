@@ -12,7 +12,7 @@ pub const NETWORK_RF_FREQUENCY: u8 = 57;
 
 pub const fn duration_to_search_timeout(t: Duration) -> u8 {
     // Scale up by 10 to avoid floating point math as ratio is 2.5s to 1 count
-    return ((t.as_secs() * 10) / (25)) as u8;
+    ((t.as_secs() * 10) / (25)) as u8
 }
 
 pub mod common_datapages;

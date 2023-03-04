@@ -302,9 +302,9 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
         Err(RouterError::ChannelNotAssociated())
     }
 
-    /// Allow for registering a callback to obersve all messages, this is meant for debugging or
+    /// Register a callback to obersve all messages, this is meant for debugging or
     /// handling some radio specifics not handled by the router or a specific channel, e.g.
-    /// capabilities
+    /// capabilities messages
     pub fn set_rx_message_callback(&mut self, f: Option<fn(&AntMessage)>) {
         self.rx_message_callback = f;
     }
