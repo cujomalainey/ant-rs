@@ -109,7 +109,7 @@ fn parse_buffer<R, W>(buf: &Buffer) -> Result<Option<AntMessage>, DriverError<R,
     }
 
     let expected_checksum = calculate_checksum(&buf[..(header.msg_length as usize) + HEADER_SIZE]);
-    let checksum = buf[(header.msg_length + 3) as usize];
+    let checksum = buf[(header.msg_length as usize) + HEADER_SIZE];
     if expected_checksum != checksum {
         return Err(DriverError::BadChecksum(checksum, expected_checksum));
     }
