@@ -46,6 +46,10 @@ fn main() -> std::io::Result<()> {
     let driver = SerialDriver::<_, StubPin>::new(usb_driver, None);
     let router = Router::new(driver).unwrap();
     let hr = HeartRateDisplay::new(None);
+    hr.borrow_mut()
+        .set_rx_datapage_callback(Some(|x| println!("{:#?}", x)));
+    hr.borrow_mut()
+        .set_rx_message_callback(Some(|x| println!("{:#?}", x)));
     router
         .borrow_mut()
         .set_key(

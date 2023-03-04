@@ -42,6 +42,8 @@ pub struct HeartRateDisplay<R, W, D: Driver<R, W>> {
     device_number: u16,
     transmission_type: TransmissionType,
     router: Weak<RefCell<Router<R, W, D>>>,
+    rx_message_callback: Option<fn(&AntMessage)>,
+    rx_datapage_callback: Option<fn(Result<DataPages, HeartRateError>)>,
 }
 
 impl<R, W, D: Driver<R, W>> HeartRateDisplay<R, W, D> {
@@ -54,7 +56,17 @@ impl<R, W, D: Driver<R, W>> HeartRateDisplay<R, W, D> {
             device_number,
             transmission_type,
             router: Weak::new(),
+            rx_message_callback: None,
+            rx_datapage_callback: None,
         }))
+    }
+
+    pub fn set_rx_message_callback(&mut self, f: Option<fn(&AntMessage)>) {
+        self.rx_message_callback = f;
+    }
+
+    pub fn set_rx_datapage_callback(&mut self, f: Option<fn(Result<DataPages, HeartRateError>)>) {
+        self.rx_datapage_callback = f;
     }
 
     pub fn open(&self) -> Result<(), RouterError> {
@@ -101,7 +113,9 @@ impl<R, W, D: Driver<R, W>> HeartRateDisplay<R, W, D> {
     // get result and call callback
     fn handle_dp(&mut self, data: &[u8; 8]) {
         let dp = self.parse_dp(data);
-        println!("{:#?}", dp);
+        if let Some(f) = self.rx_datapage_callback {
+            f(dp);
+        }
     }
 
     fn parse_dp(&mut self, data: &[u8; 8]) -> Result<DataPages, HeartRateError> {
@@ -153,6 +167,9 @@ impl<R, W, D: Driver<R, W>> HeartRateDisplay<R, W, D> {
 
 impl<R, W, D: Driver<R, W>> Channel<R, W, D> for HeartRateDisplay<R, W, D> {
     fn receive_message(&mut self, msg: &AntMessage) {
+        if let Some(f) = self.rx_message_callback {
+            f(msg);
+        }
         match msg.message {
             RxMessageType::BroadcastData(msg) => self.handle_dp(&msg.payload.data),
             RxMessageType::AcknowledgedData(msg) => self.handle_dp(&msg.payload.data),
