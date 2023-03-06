@@ -1,51 +1,147 @@
 on: [push, pull_request]
 
-
 jobs:
   clippy_check:
-    name: Clippy check
-    runs-on: ubuntu-latest
+    name: Clippy
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-apple-darwin, x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu, thumbv7em-none-eabihf]
+        include:
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+          - target: thumbv7em-none-eabihf
+            runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
-      - run: rustup component add clippy
-      - uses: actions-rs/clippy-check@v1
+      - uses: actions-rs/toolchain@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+            target: ${{ matrix.target }}
+            override: true
+            profile: minimal
+            components: clippy
+            toolchain: stable
+      - run: cargo clippy --no-deps --target ${{ matrix.target }}
 
   docs:
     name: Docs
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-apple-darwin, x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu, thumbv7em-none-eabihf]
+        include:
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+          - target: thumbv7em-none-eabihf
+            runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     steps:
-      - uses: olix0r/cargo-action-fmt/setup@v2
       - uses: actions/checkout@v3
-      - run: cargo doc --no-deps --message-format=json | cargo-action-fmt
+      - uses: actions-rs/toolchain@v1
+        with:
+            target: ${{ matrix.target }}
+            profile: minimal
+            override: true
+            components: rust-docs
+            toolchain: stable
+      - run: cargo doc --no-deps --target ${{ matrix.target }}
 
   format:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rs/toolchain@v1
+        with:
+            profile: minimal
+            override: true
+            components: rustfmt
+            toolchain: stable
       - uses: mbrobbel/rustfmt-check@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-  build:
-    name: Build
+  build_macos:
+    name: Build MacOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+            target: x86_64-apple-darwin
+            profile: minimal
+            override: true
+            toolchain: stable
+      - run: cargo build --release --all-features
+      - run: cargo build --example mac_usb
+      - run: cargo build --example mac_usb_hr_display
+  build_windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+            target: x86_64-pc-windows-msvc
+            profile: minimal
+            override: true
+            toolchain: stable
+      - run: cargo build --release --all-features
+  build_linux:
+    name: Build Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+            target: x86_64-unknown-linux-gnu
+            profile: minimal
+            override: true
+            toolchain: stable
+      - run: cargo build --release --all-features
+      - run: cargo build --example linux_usb
+  build_arm:
+    name: Build Arm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+            target: thumbv7em-none-eabihf
+            profile: minimal
+            override: true
+            toolchain: stable
       - run: cargo build --release --all-features
   test:
     name: Test
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-apple-darwin, x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu, thumbv7em-none-eabihf]
+        include:
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+          - target: thumbv7em-none-eabihf
+            runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
-      - run: cargo test --tests
-  # TODO add example compilation
+            target: ${{ matrix.target }}
+            profile: minimal
+            override: true
+            toolchain: stable
+      - run: cargo test --tests --target ${{ matrix.target }}
