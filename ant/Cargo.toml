@@ -1,5 +1,12 @@
 [package]
 name = "ant"
+description = "ANT, ANT-FS, ANT+ drivers, parsers and managers"
+repository = "https://github.com/cujomalainey/ant-rs"
+authors = ["Curtis Malainey <curtis@malainey.com>"]
+license = "MIT OR Apache-2.0"
+keywords = ["ANT", "ANT+", "ANT-FS", "driver", "serialization"]
+categories = ["embedded development", "encoding", "hardware support"]
+readme = "../README.md"
 version = "0.1.0"
 edition = "2021"
 
