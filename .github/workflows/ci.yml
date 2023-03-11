@@ -6,12 +6,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-            override: true
-            profile: minimal
             components: clippy
-            toolchain: stable
       - run: cargo clippy --no-deps
       - run: cargo clippy --no-deps --all-features
 
@@ -20,12 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-            profile: minimal
-            override: true
             components: rust-docs
-            toolchain: stable
       - run: cargo doc --no-deps
       - run: cargo doc --no-deps --all-features
 
@@ -34,12 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-            profile: minimal
-            override: true
             components: rustfmt
-            toolchain: stable
       - uses: mbrobbel/rustfmt-check@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -48,12 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-            target: x86_64-unknown-linux-gnu
-            profile: minimal
-            override: true
-            toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release
       - run: cargo build --release --all-features
       - run: cargo build --example linux_usb
@@ -64,9 +50,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-            profile: minimal
-            override: true
-            toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --tests
