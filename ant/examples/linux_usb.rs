@@ -13,7 +13,7 @@ use linux_embedded_hal::Serial;
 
 fn main() -> std::io::Result<()> {
     // TODO make the tty an arguement
-    let mut serial = Serial::new("/dev/tty123456789");
+    let mut serial = Serial::open("/dev/tty123456789").expect("Serial failed to open");
     let mut driver = SerialDriver::<_, StubPin>::new(serial, None);
     let assign = AssignChannel::new(0, ChannelType::BidirectionalSlave, 0, None);
     let key = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // get this
