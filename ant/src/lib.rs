@@ -41,6 +41,12 @@
 //!
 //! TODO TX example via usb
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+extern crate core as std;
+
 pub mod drivers;
 pub mod fields;
 pub mod messages;
