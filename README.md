@@ -1,6 +1,11 @@
 # ant-rs
 A general purpose ANT* crate for rust
 
+![Build & Test](https://github.com/cujomalainey/ant-rs/actions/workflows/ci.yml/badge.svg?branch=main)
+![Crates.io](https://img.shields.io/crates/v/ant)
+![License](https://img.shields.io/crates/l/ant)
+![Downloads](https://img.shields.io/crates/d/ant)
+
 ## ant
 General purpose messaging with ANT radios (usb/serial supported, spi/softdevice work in progress)
 
