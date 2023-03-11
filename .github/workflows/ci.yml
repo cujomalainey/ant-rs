@@ -24,16 +24,14 @@ jobs:
       - run: cargo doc --no-deps --all-features
 
   format:
-    name: Rustfmt
+    name: Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
         with:
             components: rustfmt
-      - uses: mbrobbel/rustfmt-check@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: cargo fmt --check
   build_linux:
     name: Build
     runs-on: ubuntu-latest
