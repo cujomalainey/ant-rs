@@ -147,20 +147,15 @@ impl RequestDataPage {
     }
 }
 
-#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum CommandStatusValue {
     Pass = 0,
     Fail = 1,
     NotSupported = 2,
     Rejected = 3,
     Pending = 4,
+    #[default]
     Uninitialized = 255,
-}
-
-impl Default for CommandStatusValue {
-    fn default() -> Self {
-        CommandStatusValue::Uninitialized
-    }
 }
 
 #[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
@@ -430,7 +425,7 @@ impl ProductInformation {
     }
 }
 
-#[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
+#[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug, Default)]
 pub enum BatteryStatusField {
     Reserved0 = 0,
     New = 1,
@@ -439,13 +434,8 @@ pub enum BatteryStatusField {
     Low = 4,
     Critical = 5,
     Reserved1 = 6,
+    #[default]
     Invalid = 7,
-}
-
-impl Default for BatteryStatusField {
-    fn default() -> Self {
-        BatteryStatusField::Invalid
-    }
 }
 
 // This is a copy o ComponentIdentifier but with its fields renamed to match the datasheet

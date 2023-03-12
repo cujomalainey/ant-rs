@@ -10,30 +10,20 @@ use packed_struct::prelude::*;
 
 use crate::drivers::DriverError;
 
-#[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
+#[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug, Default)]
 pub enum TransmissionChannelType {
     Reserved = 0b00,
+    #[default]
     IndependentChannel = 0b01,
     SharedChannel1ByteAddress = 0b10,
     SharedChannel2ByteAddress = 0b11,
 }
 
-impl Default for TransmissionChannelType {
-    fn default() -> Self {
-        TransmissionChannelType::IndependentChannel
-    }
-}
-
-#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum TransmissionGlobalDataPages {
+    #[default]
     GlobalDataPagesNotUsed = 0,
     GlobalDataPagesUsed = 1,
-}
-
-impl Default for TransmissionGlobalDataPages {
-    fn default() -> Self {
-        TransmissionGlobalDataPages::GlobalDataPagesNotUsed
-    }
 }
 
 #[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
@@ -118,66 +108,41 @@ impl Wildcard for DeviceType {
     }
 }
 
-impl Default for ListExclusion {
-    fn default() -> Self {
-        ListExclusion::Include
-    }
-}
-
-#[derive(PrimitiveEnum_u16, Clone, Copy, PartialEq, Debug)]
+#[derive(PrimitiveEnum_u16, Clone, Copy, PartialEq, Debug, Default)]
 pub enum SearchWaveformValue {
+    #[default]
     Standard = 316,
     Fast = 97,
 }
 
-impl Default for SearchWaveformValue {
-    fn default() -> Self {
-        Self::Standard
-    }
-}
-
-#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum EventBufferConfig {
+    #[default]
     BufferLowPriorityEvents = 0,
     BufferAllEvents = 1,
 }
 
-impl Default for EventBufferConfig {
-    fn default() -> Self {
-        EventBufferConfig::BufferLowPriorityEvents
-    }
-}
-
-#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum AdvancedBurstMaxPacketLength {
+    #[default]
     Max8Byte = 0x01,
     Max16Byte = 0x02,
     Max24Byte = 0x03,
 }
 
-impl Default for AdvancedBurstMaxPacketLength {
-    fn default() -> Self {
-        AdvancedBurstMaxPacketLength::Max8Byte
-    }
-}
-
-#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum ListExclusion {
+    #[default]
     Include = 0,
     Exclude = 1,
 }
 
-#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum EncryptionMode {
+    #[default]
     Disable = 0x00,
     Enable = 0x01,
     EnabledAndIncludeUserInformationString = 0x02,
-}
-
-impl Default for EncryptionMode {
-    fn default() -> Self {
-        EncryptionMode::Disable
-    }
 }
 
 #[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
@@ -233,20 +198,15 @@ pub struct TxMessageHeader {
 // Note, this is bit shifted 4 bits relative to the offical doc because the field would overlap in
 // the channel status message. The result is the same just a minor mismatch compared to official
 // docs
-#[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq)]
+#[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq, Default)]
 pub enum ChannelType {
+    #[default]
     BidirectionalSlave = 0,
     BidirectionalMaster = 1,
     SharedBidirectionalSlave = 2,
     SharedBidirectionalMaster = 3,
     SharedReceiveOnly = 4,
     MasterTransmitOnly = 5,
-}
-
-impl Default for ChannelType {
-    fn default() -> Self {
-        ChannelType::BidirectionalSlave
-    }
 }
 
 #[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq)]
@@ -344,16 +304,11 @@ pub enum RequestableMessageId {
     AdvancedBurstCapabilities = 0x78,
 }
 
-#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum ListType {
+    #[default]
     Whitelist = 0,
     Blacklist = 1,
-}
-
-impl Default for ListType {
-    fn default() -> Self {
-        ListType::Whitelist
-    }
 }
 
 #[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
