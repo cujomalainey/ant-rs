@@ -1,7 +1,7 @@
 # ant-rs
 A general purpose ANT* crate for rust
 
-![Build & Test](https://github.com/cujomalainey/ant-rs/actions/workflows/ci.yml/badge.svg?branch=main)
+![Build & Test](https://img.shields.io/github/actions/workflow/status/cujomalainey/ant-rs/ci.yml?branch=main&label=Build%20%26%20Test)
 ![Crates.io](https://img.shields.io/crates/v/ant)
 ![License](https://img.shields.io/crates/l/ant)
 ![Downloads](https://img.shields.io/crates/d/ant)
