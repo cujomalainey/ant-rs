@@ -9,8 +9,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
             components: clippy
-      - run: cargo clippy --no-deps
-      - run: cargo clippy --no-deps --all-features
+      - run: cargo clippy --no-deps -- -Dwarnings
+      - run: cargo clippy --no-deps --all-features -- -Dwarnings
 
   docs:
     name: Docs
