@@ -9,7 +9,8 @@
 use crate::fields::{DeviceType, TransmissionType};
 use ant_derive::DataPage;
 use packed_struct::prelude::*;
-use std::ops::RangeInclusive;
+
+use core::ops::RangeInclusive;
 
 pub const MANUFACTURER_SPECIFIC_RANGE: RangeInclusive<u8> = 112..=127;
 
@@ -190,6 +191,24 @@ impl CommandStatus {
     }
 }
 
+pub enum GenericCommandType {
+    AntPlusProfileSpecific(u16),
+    CustomCommand(u16),
+    NoCommand(u16),
+}
+
+impl From<u16> for GenericCommandType {
+    fn from(field: u16) -> Self {
+        match field {
+            // NOTE: this value deviates from the datasheets defined 32787 as that overlaps with the above
+            // range and is an assumed error in the document
+            0..=32767 => GenericCommandType::AntPlusProfileSpecific(field),
+            32768..=65534 => GenericCommandType::CustomCommand(field),
+            65535 => GenericCommandType::NoCommand(field),
+        }
+    }
+}
+
 #[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct GenericCommandPage {
@@ -203,7 +222,6 @@ pub struct GenericCommandPage {
     pub sequence_number: u8,
     #[packed_field(bytes = "6:7")]
     pub command_number: u16,
-    // TODO add no command check
 }
 
 impl GenericCommandPage {
@@ -220,6 +238,10 @@ impl GenericCommandPage {
             sequence_number,
             command_number,
         }
+    }
+
+    pub fn get_generic_command(&self) -> GenericCommandType {
+        self.command_number.into()
     }
 }
 
