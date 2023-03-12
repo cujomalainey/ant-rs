@@ -8,7 +8,12 @@
 
 use crate::drivers::*;
 use crate::messages::*;
+
 use std::cell::{Cell, RefCell};
+
+#[cfg(not(feature = "std"))]
+use alloc::rc::{Rc, Weak};
+#[cfg(feature = "std")]
 use std::rc::{Rc, Weak};
 
 #[derive(Debug)]

@@ -20,9 +20,14 @@ use crate::plus::profiles::heart_rate::{
 };
 use crate::plus::router::{Channel, ChannelError, NetworkKey, Router, RouterError};
 use crate::plus::{duration_to_search_timeout, NETWORK_RF_FREQUENCY};
-use core::time::Duration;
 use packed_struct::{PackedStruct, PrimitiveEnum};
+
 use std::cell::RefCell;
+use std::time::Duration;
+
+#[cfg(not(feature = "std"))]
+use alloc::rc::{Rc, Weak};
+#[cfg(feature = "std")]
 use std::rc::{Rc, Weak};
 
 #[derive(PartialEq, Copy, Clone, Debug)]
