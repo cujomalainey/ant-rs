@@ -17,7 +17,6 @@ use packed_struct::{PackedStructSlice, PackingError};
 use std::array::TryFromSliceError;
 use std::cell::RefCell;
 use std::cmp;
-use thiserror::Error;
 
 pub trait Driver<R, W> {
     fn get_message(&mut self) -> Result<Option<AntMessage>, DriverError<R, W>>;
@@ -313,29 +312,18 @@ fn create_packed_message<'a, R, W>(
     Ok(&buf[..padded_len + 1])
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub enum DriverError<R, W> {
-    #[error("IO read error: {0}")]
     ReadError(nb::Error<R>),
-    #[error("IO write error: {0}")]
     WriteError(nb::Error<W>),
-    #[error("Message has bad checksum: {0}, expected {0}")]
     BadChecksum(u8, u8),
-    #[error("Got {0} bytes but expected {1}")]
     BadLength(usize, usize),
-    #[error("Invalid byte pattern: {0}")]
     PackingError(PackingError),
-    #[error("Refcell already in use, hint: don't get messages from within callbacks")]
     ReferenceError(),
-    #[error("Field parsing error for message")]
     InvalidData(),
-    #[error("Messsage is of size {0}, allocated buffer is {1}")]
     BufferTooSmall(usize, usize),
-    #[error("Slicing bug")]
     SliceError(TryFromSliceError),
-    #[error("Capacity bug")]
     CapacityError(CapacityError),
-    #[error("Pin Change error")]
     PinChangeBug(PinState), // TODO update this to use the type provided by the pin trait
 }
 
@@ -374,9 +362,8 @@ mod tests {
         Error(nb::Error<SerialError>),
     }
 
-    #[derive(Debug, PartialEq, Error, Clone, Copy)]
+    #[derive(Debug, PartialEq, Clone, Copy)]
     enum SerialError {
-        #[error("fake error A")]
         A,
     }
 
