@@ -8,7 +8,6 @@
 
 use ant::drivers::*;
 use ant::messages::*;
-use ant::usb::*;
 use rusb::{Device, DeviceList};
 
 use dialoguer::Select;

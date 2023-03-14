@@ -6,10 +6,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use ant::drivers::{SerialDriver, StubPin};
+use ant::drivers::{is_ant_usb_device_from_device, SerialDriver, StubPin, UsbSerial};
 use ant::plus::profiles::heart_rate::HeartRateDisplay;
 use ant::plus::router::*;
-use ant::usb::{is_ant_usb_device_from_device, UsbSerial};
 use rusb::{Device, DeviceList};
 
 use dialoguer::Select;

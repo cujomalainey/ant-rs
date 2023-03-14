@@ -51,5 +51,3 @@ pub mod drivers;
 pub mod fields;
 pub mod messages;
 pub mod plus;
-#[cfg(feature = "usb")]
-pub mod usb;
