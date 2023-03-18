@@ -10,7 +10,7 @@ jobs:
         with:
             components: clippy
       - run: cargo clippy --no-deps -- -Dwarnings
-      - run: cargo clippy --no-deps --all-features -- -Dwarnings
+      - run: cargo clippy --no-deps --no-default-features -- -Dwarnings
 
   docs:
     name: Docs
@@ -21,7 +21,7 @@ jobs:
         with:
             components: rust-docs
       - run: cargo doc --no-deps
-      - run: cargo doc --no-deps --all-features
+      - run: cargo doc --no-deps --no-default-features
 
   format:
     name: Format
@@ -39,11 +39,11 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release
-      - run: cargo build --release --all-features
-      - run: cargo build --example linux_usb
-      - run: cargo build --example mac_usb --all-features
-      - run: cargo build --example mac_usb_hr_display --all-features
-      - run: cargo build --example mac_usb_tx --all-features
+      - run: cargo build --release --no-default-features
+      - run: cargo build --example linux_usb --no-default-features --features "alloc std"
+      - run: cargo build --example mac_usb
+      - run: cargo build --example mac_usb_hr_display
+      - run: cargo build --example mac_usb_tx
       - run: cargo build --example no_std_ant --no-default-features
   test:
     name: Test
