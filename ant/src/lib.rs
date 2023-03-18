@@ -38,8 +38,6 @@
 //!     * ANT-FS support
 //!  * no_std support
 //!  * Provide hooks for user to parse unknown messages/formats
-//!
-//! TODO TX example via usb
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

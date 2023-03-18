@@ -43,6 +43,7 @@ jobs:
       - run: cargo build --example linux_usb
       - run: cargo build --example mac_usb --all-features
       - run: cargo build --example mac_usb_hr_display --all-features
+      - run: cargo build --example mac_usb_tx --all-features
       - run: cargo build --example no_std_ant --no-default-features
   test:
     name: Test
