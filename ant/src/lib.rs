@@ -27,6 +27,7 @@
 //!  * Support for all documented modern messages with optional fields
 //!  * Byte transport is abstracted so any platform can be used
 //!  * No direct heap usage when only using the drivers
+//!  * no_std support
 //!
 //! ## Roadmap
 //!  * Softdevice support
@@ -36,7 +37,6 @@
 //!  * Safe processing of data (no_panic)
 //!  * Extended format support
 //!     * ANT-FS support
-//!  * no_std support
 //!  * Provide hooks for user to parse unknown messages/formats
 
 #![cfg_attr(not(feature = "std"), no_std)]
