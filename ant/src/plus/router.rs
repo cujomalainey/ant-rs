@@ -26,7 +26,7 @@ pub enum RouterError {
     DeviceCapabilitiesUnknown(),
     ChannelAlreadyAssigned(),
     DriverError(),
-    IndexOutOfBounds(),
+    ChannelOutOfBounds(),
     ChannelNotAssociated(),
     NetworkIndexInUse(),
     FailedToGetCapabilities(),
@@ -71,17 +71,12 @@ pub trait Channel<R, W, D: Driver<R, W>> {
         router: Weak<RefCell<Router<R, W, D>>>,
         channel: u8,
     ) -> Result<(), ChannelError>;
-    /// This is called when the router observers a radio reboot and is configured to "Rebuild
-    /// Channels". This callback is for channels to attempt to restore their configurations on the
-    /// hardware. If you are unable to restore state then you may return a ChannelError
-    fn reconnect(&mut self) -> Result<(), ChannelError>;
 }
 
 pub struct Router<R, W, D: Driver<R, W>> {
     channels: [Option<ChannelHandler<R, W, D>>; MAX_CHANNELS],
     max_channels: Cell<usize>, // what the hardware reports as some have less than max
     driver: RefCell<D>,
-    reboot_action: RebootAction,
     rc_ref: Weak<RefCell<Self>>,
     network_key_indexes: [Option<NetworkKey>; MAX_NETWORKS],
     max_networks: Cell<usize>,
@@ -100,22 +95,6 @@ impl From<ChannelError> for RouterError {
     fn from(err: ChannelError) -> Self {
         RouterError::ChannelError(err)
     }
-}
-
-/// This defines the behaviour of the router in the event a startup message is observed when the
-/// radio is rebooted via a [StartUpMessage::watch_dog_reset]. All other reboot events are assumed
-/// to be user triggered.
-#[derive(Debug, PartialEq, Eq)]
-pub enum RebootAction {
-    /// This will trigger the router to call [reconnect](Channel::reconnect) on all registered channels to attempt a
-    /// restore of state on the hardware. Should a channel fail the restore will return the error
-    /// in the loop call and resume the restore on the next call for the rest of the channels.
-    RebuildChannels,
-    /// This will cause all channels to get a [set_router](Channel::set_router) callback with the router assigned.
-    /// Properly designed channels will treat this as a reset and clear any internal state. This
-    /// will leave the system associated in software but unconfigured in hardware until state is
-    /// pushed by the channels.
-    DoNothing,
 }
 
 const ROUTER_CAPABILITIES_RETRIES: u8 = 25;
@@ -143,7 +122,6 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
                 max_networks: Cell::new(0),
                 reset_restore: Cell::new(false),
                 driver: RefCell::new(driver),
-                reboot_action: RebootAction::RebuildChannels,
                 rc_ref: me.clone(),
                 rx_message_callback: None,
             })
@@ -207,12 +185,6 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
             .map(|x| x as u8)
     }
 
-    /// Change the router behaviour when a radio restart is observed, see [RebootAction], default is
-    /// [RebuildChannels](RebootAction::RebuildChannels)
-    pub fn set_reboot_action(&mut self, action: RebootAction) {
-        self.reboot_action = action;
-    }
-
     /// Add a channel at next available index
     pub fn add_channel(&mut self, channel: ChannelHandler<R, W, D>) -> Result<(), RouterError> {
         let index = self.channels.iter().position(|x| x.is_none());
@@ -234,7 +206,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
         index: usize,
     ) -> Result<(), RouterError> {
         if index >= self.max_channels.get() {
-            return Err(RouterError::IndexOutOfBounds());
+            return Err(RouterError::ChannelOutOfBounds());
         }
         if self.channels[index].is_some() {
             return Err(RouterError::ChannelAlreadyAssigned());
@@ -258,19 +230,6 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
         if !restore {
             // TODO release profiles
         }
-        Ok(())
-    }
-
-    // Radio reboot handler
-    fn radio_reboot(&self, msg: &StartUpMessage) -> Result<(), RouterError> {
-        // TODO test
-        if !((msg.watch_dog_reset && self.reboot_action == RebootAction::RebuildChannels)
-            || self.reset_restore.get())
-        {
-            return Ok(());
-        }
-        self.reset_restore.set(false);
-        // TODO go through each channel and reopen. might need to track state
         Ok(())
     }
 
@@ -315,10 +274,18 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     }
 
     fn route_message(&self, channel: u8, msg: &AntMessage) -> Result<(), RouterError> {
+        if channel as usize >= MAX_CHANNELS {
+            return Err(RouterError::ChannelOutOfBounds());
+        }
         match &self.channels[channel as usize] {
             Some(handler) => handler.borrow_mut().receive_message(msg),
-            None => (), // TODO decide if this is error worthy
+            None => return Err(RouterError::ChannelNotAssociated()),
         };
+        Ok(())
+    }
+
+    fn broadcast_message(&self, msg: &AntMessage) -> Result<(), RouterError> {
+        self.channels.iter().flatten().for_each(|x| x.borrow_mut().receive_message(msg));
         Ok(())
     }
 
@@ -335,7 +302,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
             f(msg);
         }
         match &msg.message {
-            RxMessageType::StartUpMessage(start) => self.radio_reboot(start),
+            RxMessageType::StartUpMessage(_) => self.broadcast_message(msg),
             RxMessageType::BroadcastData(data) => {
                 self.route_message(data.payload.channel_number, msg)
             }

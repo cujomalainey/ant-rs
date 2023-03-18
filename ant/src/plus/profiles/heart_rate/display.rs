@@ -197,10 +197,6 @@ impl<R, W, D: Driver<R, W>> Channel<R, W, D> for HeartRateDisplay<R, W, D> {
         self.router = router;
         Ok(())
     }
-
-    fn reconnect(&mut self) -> Result<(), ChannelError> {
-        todo!()
-    }
 }
 
 // TODO extend to user errors
