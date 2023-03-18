@@ -285,7 +285,10 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     }
 
     fn broadcast_message(&self, msg: &AntMessage) {
-        self.channels.iter().flatten().for_each(|x| x.borrow_mut().receive_message(msg));
+        self.channels
+            .iter()
+            .flatten()
+            .for_each(|x| x.borrow_mut().receive_message(msg));
     }
 
     fn parse_capabilities(&self, msg: &Capabilities) {
