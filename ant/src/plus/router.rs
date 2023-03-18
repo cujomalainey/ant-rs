@@ -284,17 +284,15 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
         Ok(())
     }
 
-    fn broadcast_message(&self, msg: &AntMessage) -> Result<(), RouterError> {
+    fn broadcast_message(&self, msg: &AntMessage) {
         self.channels.iter().flatten().for_each(|x| x.borrow_mut().receive_message(msg));
-        Ok(())
     }
 
-    fn parse_capabilities(&self, msg: &Capabilities) -> Result<(), RouterError> {
+    fn parse_capabilities(&self, msg: &Capabilities) {
         self.max_channels
             .set(msg.base_capabilities.max_ant_channels as usize);
         self.max_networks
             .set(msg.base_capabilities.max_networks as usize);
-        Ok(())
     }
 
     fn handle_message(&self, msg: &AntMessage) -> Result<(), RouterError> {
@@ -302,7 +300,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
             f(msg);
         }
         match &msg.message {
-            RxMessageType::StartUpMessage(_) => self.broadcast_message(msg),
+            // These messages all have channel information, forward it accordingly
             RxMessageType::BroadcastData(data) => {
                 self.route_message(data.payload.channel_number, msg)
             }
@@ -321,18 +319,38 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
             RxMessageType::ChannelResponse(data) => self.route_message(data.channel_number, msg),
             RxMessageType::ChannelStatus(data) => self.route_message(data.channel_number, msg),
             RxMessageType::ChannelId(data) => self.route_message(data.channel_number, msg),
-            // TODO need to decide what to do with all these if they should be broadcast or not
-            RxMessageType::Capabilities(data) => self.parse_capabilities(data),
+            // These messages can all provide actionable information to the profile but are not
+            // channel specific
+            RxMessageType::StartUpMessage(_) => {
+                self.broadcast_message(msg);
+                Ok(())
+            }
+            RxMessageType::Capabilities(data) => {
+                self.broadcast_message(msg);
+                self.parse_capabilities(data);
+                Ok(())
+            }
+            RxMessageType::AdvancedBurstCapabilities(_) => {
+                self.broadcast_message(msg);
+                Ok(())
+            }
+            RxMessageType::AdvancedBurstConfiguration(_) => {
+                self.broadcast_message(msg);
+                Ok(())
+            }
+            RxMessageType::EncryptionModeParameters(_) => {
+                self.broadcast_message(msg);
+                Ok(())
+            }
+            // These message are not channel specific and operate at the router scope, should be
+            // consumed directly at router callback
+            RxMessageType::EventFilter(_) => Ok(()),
             RxMessageType::SerialErrorMessage(_) => Ok(()),
             RxMessageType::AntVersion(_) => Ok(()),
             RxMessageType::SerialNumber(_) => Ok(()),
             RxMessageType::EventBufferConfiguration(_) => Ok(()),
-            RxMessageType::AdvancedBurstCapabilities(_) => Ok(()),
-            RxMessageType::AdvancedBurstConfiguration(_) => Ok(()),
-            RxMessageType::EventFilter(_) => Ok(()),
             RxMessageType::SelectiveDataUpdateMaskSetting(_) => Ok(()),
             RxMessageType::UserNvm(_) => Ok(()),
-            RxMessageType::EncryptionModeParameters(_) => Ok(()),
         }?;
         Ok(())
     }
