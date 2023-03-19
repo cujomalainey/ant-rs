@@ -76,7 +76,7 @@ pub enum TxMessage {
 
 impl AntTxMessageType for TxMessage {
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
-        return match self {
+        match self {
             TxMessage::AssignChannel(ac) => ac.serialize_message(buf),
             TxMessage::ChannelId(id) => id.serialize_message(buf),
             TxMessage::ChannelPeriod(cp) => cp.serialize_message(buf),
@@ -84,10 +84,10 @@ impl AntTxMessageType for TxMessage {
             TxMessage::SearchTimeout(st) => st.serialize_message(buf),
             TxMessage::OpenChannel(oc) => oc.serialize_message(buf),
             TxMessage::CloseChannel(cc) => cc.serialize_message(buf),
-        };
+        }
     }
     fn get_tx_msg_id(&self) -> TxMessageId {
-        return match self {
+        match self {
             TxMessage::AssignChannel(ac) => ac.get_tx_msg_id(),
             TxMessage::ChannelId(id) => id.get_tx_msg_id(),
             TxMessage::ChannelPeriod(cp) => cp.get_tx_msg_id(),
@@ -95,7 +95,7 @@ impl AntTxMessageType for TxMessage {
             TxMessage::SearchTimeout(st) => st.get_tx_msg_id(),
             TxMessage::OpenChannel(oc) => oc.get_tx_msg_id(),
             TxMessage::CloseChannel(cc) => cc.get_tx_msg_id(),
-        };
+        }
     }
 }
 

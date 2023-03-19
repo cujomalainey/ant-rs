@@ -78,6 +78,7 @@ type SharedChannel = Rc<RefCell<dyn Channel>>;
 pub struct Router<R, W, D: Driver<R, W>> {
     channels: [Option<SharedChannel>; MAX_CHANNELS],
     max_channels: Cell<usize>, // what the hardware reports as some have less than max
+    // TODO remove this refcell
     driver: RefCell<D>,
     network_key_indexes: [Option<NetworkKey>; MAX_NETWORKS],
     max_networks: Cell<usize>,
@@ -365,13 +366,21 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
 
     /// Parse all incoming messages and run callbacks
     pub fn process(&self) -> Result<(), RouterError> {
-        loop {
-            let msg = self.driver.borrow_mut().get_message()?;
-            match msg {
-                None => return Ok(()),
-                Some(x) => self.handle_message(&x)?,
-            }
+        while let Some(msg) = self.driver.borrow_mut().get_message()? {
+            self.handle_message(&msg)?;
         }
+        self.channels
+            .iter()
+            .flatten()
+            .try_for_each(|x| self.send_channel(x))
+    }
+
+    pub fn send_channel(&self, channel: &SharedChannel) -> Result<(), RouterError> {
+        let mut driver = self.driver.borrow_mut();
+        while let Some(msg) = channel.borrow_mut().send_message() {
+            driver.send_message(&msg)?;
+        }
+        Ok(())
     }
 
     /// Teardown router and return driver

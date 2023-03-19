@@ -9,9 +9,11 @@
 use ant::drivers::{is_ant_usb_device_from_device, SerialDriver, StubPin, UsbSerial};
 use ant::plus::profiles::heart_rate::HeartRateDisplay;
 use ant::plus::router::*;
+use dialoguer::Select;
 use rusb::{Device, DeviceList};
 
-use dialoguer::Select;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn main() -> std::io::Result<()> {
     let mut devices: Vec<Device<_>> = DeviceList::new()
@@ -43,25 +45,21 @@ fn main() -> std::io::Result<()> {
     let usb_driver = UsbSerial::new(device).unwrap();
 
     let driver = SerialDriver::<_, StubPin>::new(usb_driver, None);
-    let router = Router::new(driver).unwrap();
-    let hr = HeartRateDisplay::new(None);
+    let mut router = Router::new(driver).unwrap();
+    let hr = Rc::new(RefCell::new(HeartRateDisplay::new(None, 0)));
     hr.borrow_mut()
         .set_rx_datapage_callback(Some(|x| println!("{:#?}", x)));
     hr.borrow_mut()
         .set_rx_message_callback(Some(|x| println!("{:#?}", x)));
     router
-        .borrow_mut()
         .set_key(
             NetworkKey::AntPlusKey,
             &[0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77], // Get this from thisisant.com
         )
         .expect("set key failed");
-    router
-        .borrow_mut()
-        .add_channel(hr.clone())
-        .expect("Add channel failed");
-    hr.borrow().open().expect("Open channel failed");
+    router.add_channel(hr.clone()).expect("Add channel failed");
+    hr.borrow_mut().open();
     loop {
-        router.borrow().process().unwrap();
+        router.process().unwrap();
     }
 }
