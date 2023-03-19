@@ -31,9 +31,9 @@ inner = "0.1.1"
 
 [features]
 default = ["std", "alloc", "usb", "usb_adapter"]
-std = ["arrayvec/std", "packed_struct/std"]
+std = ["arrayvec/std", "packed_struct/std", "alloc"]
 alloc = []
-usb = []
+usb = ["std"]
 usb_adapter = ["dep:rusb", "usb"]
 
 [[test]]
