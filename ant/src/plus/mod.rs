@@ -17,4 +17,5 @@ pub const fn duration_to_search_timeout(t: Duration) -> u8 {
 
 pub mod common_datapages;
 pub mod profiles;
+#[cfg(feature = "alloc")]
 pub mod router;

@@ -41,6 +41,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core as std;

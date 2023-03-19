@@ -29,6 +29,7 @@ const ADVANCED_BURST_BUFFER_SIZE: usize = min(
 );
 pub(crate) const MAX_MESSAGE_DATA_SIZE: usize = ADVANCED_BURST_BUFFER_SIZE + 1;
 
+// TODO remove "type" suffix
 /// All supported RX messages
 #[derive(Clone, PartialEq, Debug)]
 pub enum RxMessageType {
@@ -63,6 +64,41 @@ pub enum RxMessageType {
     // #define EXTENDED_BURST_DATA                 0x5F
 }
 
+pub enum TxMessage {
+    AssignChannel(AssignChannel),
+    ChannelId(ChannelId),
+    ChannelPeriod(ChannelPeriod),
+    ChannelRfFrequency(ChannelRfFrequency),
+    SearchTimeout(SearchTimeout),
+    OpenChannel(OpenChannel),
+    CloseChannel(CloseChannel),
+}
+
+impl AntTxMessageType for TxMessage {
+    fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
+        return match self {
+            TxMessage::AssignChannel(ac) => ac.serialize_message(buf),
+            TxMessage::ChannelId(id) => id.serialize_message(buf),
+            TxMessage::ChannelPeriod(cp) => cp.serialize_message(buf),
+            TxMessage::ChannelRfFrequency(cr) => cr.serialize_message(buf),
+            TxMessage::SearchTimeout(st) => st.serialize_message(buf),
+            TxMessage::OpenChannel(oc) => oc.serialize_message(buf),
+            TxMessage::CloseChannel(cc) => cc.serialize_message(buf),
+        };
+    }
+    fn get_tx_msg_id(&self) -> TxMessageId {
+        return match self {
+            TxMessage::AssignChannel(ac) => ac.get_tx_msg_id(),
+            TxMessage::ChannelId(id) => id.get_tx_msg_id(),
+            TxMessage::ChannelPeriod(cp) => cp.get_tx_msg_id(),
+            TxMessage::ChannelRfFrequency(cr) => cr.get_tx_msg_id(),
+            TxMessage::SearchTimeout(st) => st.get_tx_msg_id(),
+            TxMessage::OpenChannel(oc) => oc.get_tx_msg_id(),
+            TxMessage::CloseChannel(cc) => cc.get_tx_msg_id(),
+        };
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 /// Represents a generic ANT radio message
 pub struct AntMessage {
@@ -72,6 +108,7 @@ pub struct AntMessage {
     pub checksum: u8,
 }
 
+// TODO remove "ant"
 /// Trait for any TX message type
 pub trait AntTxMessageType {
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError>;

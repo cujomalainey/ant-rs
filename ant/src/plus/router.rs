@@ -10,11 +10,12 @@ use crate::drivers::*;
 use crate::messages::*;
 
 use std::cell::{Cell, RefCell};
+use std::marker::PhantomData;
 
 #[cfg(not(feature = "std"))]
-use alloc::rc::{Rc, Weak};
+use alloc::rc::Rc;
 #[cfg(feature = "std")]
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub enum RouterError {
@@ -49,39 +50,41 @@ pub enum NetworkKey {
     Custom(u8),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ChannelAssignment {
+    Assigned(u8),
+    UnAssigned(),
+}
+
 // This in theory is infinite, but its what the current hardware limit is.
 /// Highest known supported channel count on a ANT device
 pub const MAX_CHANNELS: usize = 15;
 /// Highest known supported network count on a ANT device
 pub const MAX_NETWORKS: usize = 8;
 
-type ChannelHandler<R, W, D> = Rc<RefCell<dyn Channel<R, W, D>>>;
-
 /// Channel is the trait all channels must implement to register with the router
-pub trait Channel<R, W, D: Driver<R, W>> {
+pub trait Channel {
     /// All channels must be able to recieve messages and must be infalliable. If you have an
     /// error with a recieved message, deal with it internally, the router does not care.
     fn receive_message(&mut self, msg: &AntMessage);
-    /// This is the callback when a channels is associated or dissociated with a router (depending
-    /// on whether the Weak contains a ref). This is also called when the router sees the radio
-    /// reboot and is configured in "Do Nothing" state. This will signal the channels to reset
-    /// their internal state.
-    fn set_router(
-        &mut self,
-        router: Weak<RefCell<Router<R, W, D>>>,
-        channel: u8,
-    ) -> Result<(), ChannelError>;
+    /// Yield the next message the profile wishes to send
+    fn send_message(&mut self) -> Option<TxMessage>;
+    /// Assign channel from associated router or manually if not using a router
+    fn set_channel(&mut self, channel: ChannelAssignment);
 }
 
+type SharedChannel = Rc<RefCell<dyn Channel>>;
+
 pub struct Router<R, W, D: Driver<R, W>> {
-    channels: [Option<ChannelHandler<R, W, D>>; MAX_CHANNELS],
+    channels: [Option<SharedChannel>; MAX_CHANNELS],
     max_channels: Cell<usize>, // what the hardware reports as some have less than max
     driver: RefCell<D>,
-    rc_ref: Weak<RefCell<Self>>,
     network_key_indexes: [Option<NetworkKey>; MAX_NETWORKS],
     max_networks: Cell<usize>,
     reset_restore: Cell<bool>,
     rx_message_callback: Option<fn(&AntMessage)>,
+    _read_marker: PhantomData<R>,
+    _write_marker: PhantomData<W>,
 }
 
 impl<R, W> From<DriverError<R, W>> for RouterError {
@@ -100,7 +103,7 @@ impl From<ChannelError> for RouterError {
 const ROUTER_CAPABILITIES_RETRIES: u8 = 25;
 
 impl<R, W, D: Driver<R, W>> Router<R, W, D> {
-    pub fn new(mut driver: D) -> Result<Rc<RefCell<Self>>, RouterError> {
+    pub fn new(mut driver: D) -> Result<Self, RouterError> {
         // Reset system so we are coherent
         driver.send_message(&ResetSystem::new())?;
         // Purge driver state
@@ -111,25 +114,24 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
             RequestableMessageId::Capabilities,
             None,
         ))?;
-        let router = Rc::new_cyclic(|me| {
-            RefCell::new(Self {
-                channels: [
-                    None, None, None, None, None, None, None, None, None, None, None, None, None,
-                    None, None,
-                ],
-                network_key_indexes: [None; MAX_NETWORKS],
-                max_channels: Cell::new(0),
-                max_networks: Cell::new(0),
-                reset_restore: Cell::new(false),
-                driver: RefCell::new(driver),
-                rc_ref: me.clone(),
-                rx_message_callback: None,
-            })
-        });
-        // If we don't get a response within 10ms give up
+        let router = Self {
+            channels: [
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None,
+            ],
+            network_key_indexes: [None; MAX_NETWORKS],
+            max_channels: Cell::new(0),
+            max_networks: Cell::new(0),
+            reset_restore: Cell::new(false),
+            driver: RefCell::new(driver),
+            rx_message_callback: None,
+            _read_marker: PhantomData,
+            _write_marker: PhantomData,
+        };
+        // If we don't get a response within 25ms give up
         let mut i = 0;
-        while router.borrow().max_networks.get() == 0 && i < ROUTER_CAPABILITIES_RETRIES {
-            router.borrow().process()?;
+        while router.max_networks.get() == 0 && i < ROUTER_CAPABILITIES_RETRIES {
+            router.process()?;
             i += 1;
         }
         if i == ROUTER_CAPABILITIES_RETRIES {
@@ -186,7 +188,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     }
 
     /// Add a channel at next available index
-    pub fn add_channel(&mut self, channel: ChannelHandler<R, W, D>) -> Result<(), RouterError> {
+    pub fn add_channel(&mut self, channel: SharedChannel) -> Result<(), RouterError> {
         let index = self.channels.iter().position(|x| x.is_none());
         let index = match index {
             Some(x) => x,
@@ -194,7 +196,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
         };
         channel
             .borrow_mut()
-            .set_router(self.rc_ref.clone(), index as u8)?;
+            .set_channel(ChannelAssignment::Assigned(index as u8));
         self.channels[index] = Some(channel);
         Ok(())
     }
@@ -202,7 +204,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     /// Add channel at a specific index
     pub fn add_channel_at_index(
         &mut self,
-        channel: ChannelHandler<R, W, D>,
+        channel: SharedChannel,
         index: usize,
     ) -> Result<(), RouterError> {
         if index >= self.max_channels.get() {
@@ -213,7 +215,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
         }
         channel
             .borrow_mut()
-            .set_router(self.rc_ref.clone(), index as u8)?;
+            .set_channel(ChannelAssignment::Assigned(index as u8));
         self.channels[index] = Some(channel);
         Ok(())
     }
@@ -247,7 +249,8 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     // mutable state and if they recieve another message it will be a problem
 
     /// Given a reference channel remove it from the router
-    pub fn remove_channel(&mut self, channel: &ChannelHandler<R, W, D>) -> Result<(), RouterError> {
+    // TODO test
+    pub fn remove_channel(&mut self, channel: &SharedChannel) -> Result<(), RouterError> {
         let index = self
             .channels
             .iter()
@@ -256,8 +259,10 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
         if let Some(x) = index {
             let chan = self.channels[x].take();
             if let Some(chan) = chan {
-                chan.borrow_mut().set_router(Weak::new(), 0)?;
+                chan.borrow_mut()
+                    .set_channel(ChannelAssignment::UnAssigned());
             }
+            // TODO maybe reset channel?
             let mut driver = self.driver.borrow_mut();
             driver.send_message(&CloseChannel::new(x as u8))?;
             driver.send_message(&UnAssignChannel::new(x as u8))?;
