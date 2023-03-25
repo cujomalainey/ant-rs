@@ -31,6 +31,11 @@ fn impl_ant_tx(ast: &syn::DeriveInput) -> TokenStream {
                 TxMessageId::#name
             }
         }
+        impl From<#name> for TxMessage {
+            fn from(msg: #name) -> TxMessage {
+                TxMessage::#name(msg)
+            }
+        }
     };
     gen.into()
 }
