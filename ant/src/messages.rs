@@ -251,7 +251,7 @@ pub trait AntTxMessageType {
 }
 
 macro_rules! AntAutoPackWithExtention {
-    ($msg_type:ty, $id:expr, $main_field:ident, $ext_field:ident) => {
+    ($msg_type:ident, $id:expr, $main_field:ident, $ext_field:ident) => {
         impl AntTxMessageType for $msg_type {
             fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
                 let data_len = PackedStructSlice::packed_bytes_size(Some(&self.$main_field))?;
@@ -266,6 +266,11 @@ macro_rules! AntAutoPackWithExtention {
             }
             fn get_tx_msg_id(&self) -> TxMessageId {
                 $id
+            }
+        }
+        impl From<$msg_type> for TxMessage {
+            fn from(msg: $msg_type) -> TxMessage {
+                TxMessage::$msg_type(msg)
             }
         }
     };
@@ -1654,6 +1659,12 @@ impl AntTxMessageType for BroadcastData {
     }
 }
 
+impl From<BroadcastData> for TxMessage {
+    fn from(msg: BroadcastData) -> TxMessage {
+        TxMessage::BroadcastData(msg)
+    }
+}
+
 const BROADCAST_PAYLOAD_SIZE: usize = 9;
 
 impl BroadcastData {
@@ -1694,6 +1705,12 @@ impl AntTxMessageType for AcknowledgedData {
     }
     fn get_tx_msg_id(&self) -> TxMessageId {
         TxMessageId::AcknowledgedData
+    }
+}
+
+impl From<AcknowledgedData> for TxMessage {
+    fn from(msg: AcknowledgedData) -> TxMessage {
+        TxMessage::AcknowledgedData(msg)
     }
 }
 
@@ -1743,6 +1760,12 @@ impl AntTxMessageType for BurstTransferData {
     }
     fn get_tx_msg_id(&self) -> TxMessageId {
         TxMessageId::BurstTransferData
+    }
+}
+
+impl From<BurstTransferData> for TxMessage {
+    fn from(msg: BurstTransferData) -> TxMessage {
+        TxMessage::BurstTransferData(msg)
     }
 }
 
@@ -1809,6 +1832,12 @@ impl AntTxMessageType for AdvancedBurstData {
     }
     fn get_tx_msg_id(&self) -> TxMessageId {
         TxMessageId::AdvancedBurstData
+    }
+}
+
+impl From<AdvancedBurstData> for TxMessage {
+    fn from(msg: AdvancedBurstData) -> TxMessage {
+        TxMessage::AdvancedBurstData(msg)
     }
 }
 
