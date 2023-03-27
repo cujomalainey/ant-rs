@@ -11,8 +11,8 @@ use crate::fields::{
     TransmissionType, Wildcard,
 };
 use crate::messages::{
-    AntMessage, AssignChannel, ChannelId, ChannelPeriod, ChannelResponse, ChannelRfFrequency, CloseChannel,
-    OpenChannel, SearchTimeout, TxMessage, RxMessageType
+    AntMessage, AssignChannel, ChannelId, ChannelPeriod, ChannelResponse, ChannelRfFrequency,
+    CloseChannel, OpenChannel, RxMessageType, SearchTimeout, TxMessage,
 };
 use crate::plus::router::ChannelAssignment;
 use packed_struct::prelude::{packed_bits, Integer};
@@ -33,7 +33,7 @@ enum ChannelStateCommand {
 
 pub enum TransmissionTypeAssignment {
     Wildcard(),
-    DeviceNumberExtension(Integer<u8, packed_bits::Bits4>)
+    DeviceNumberExtension(Integer<u8, packed_bits::Bits4>),
 }
 
 pub struct ProfileReference {
@@ -110,7 +110,9 @@ impl MessageHandler {
             }
             ConfigureState::Period => {
                 self.configure_state = ConfigureState::Id;
-                return Some(ChannelPeriod::new(channel, self.profile_reference.channel_period).into());
+                return Some(
+                    ChannelPeriod::new(channel, self.profile_reference.channel_period).into(),
+                );
             }
             ConfigureState::Id => {
                 self.configure_state = ConfigureState::Rf;
@@ -118,7 +120,10 @@ impl MessageHandler {
                     ChannelId::new(
                         channel,
                         self.device_number,
-                        DeviceType::new(self.profile_reference.device_type.into(), self.pairing_request),
+                        DeviceType::new(
+                            self.profile_reference.device_type.into(),
+                            self.pairing_request,
+                        ),
                         match self.transmission_type {
                             TransmissionTypeAssignment::Wildcard() => {
                                 TransmissionType::new_wildcard()
@@ -165,7 +170,7 @@ impl MessageHandler {
         match &msg.message {
             RxMessageType::ChannelResponse(msg) => self.handle_response(msg),
             RxMessageType::ChannelId(msg) => self.handle_id(msg),
-            _ => ()
+            _ => (),
         }
     }
 
