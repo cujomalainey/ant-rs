@@ -1081,6 +1081,7 @@ pub struct ConfigureAdvancedBurst {
     /// Required Fields
     pub data: ConfigureAdvancedBurstData,
     /// Optional stall count fields
+    // TODO why is this no just raw u8 and u16?
     pub stall_count: Option<Integer<u16, packed_bits::Bits16>>,
     /// Optional retry count fields
     ///

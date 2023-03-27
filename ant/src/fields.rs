@@ -35,6 +35,8 @@ pub struct TransmissionType {
     pub global_datapages_used: TransmissionGlobalDataPages,
     #[packed_field(bits = "3")]
     _reserved: ReservedZeroes<packed_bits::Bits1>,
+    // TODO alias this type when https://github.com/hashmismatch/packed_struct.rs/issues/86 is
+    // resolved
     #[packed_field(bits = "4:7")]
     pub device_number_extension: Integer<u8, packed_bits::Bits4>,
 }
@@ -54,6 +56,7 @@ impl TransmissionType {
     }
 }
 
+// TODO remove this, its dumb
 pub trait Wildcard {
     fn wildcard(&mut self);
     fn new_wildcard() -> Self;
