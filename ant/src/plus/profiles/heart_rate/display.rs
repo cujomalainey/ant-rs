@@ -233,7 +233,6 @@ impl Channel for HeartRateDisplay {
 // TODO extend to user errors
 #[derive(Debug, Clone)]
 pub enum HeartRateError {
-    Bleh,
     BytePatternError(packed_struct::PackingError),
     UnsupportedDataPage(u8),
 }
