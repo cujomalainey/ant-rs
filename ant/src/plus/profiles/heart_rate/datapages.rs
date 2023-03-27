@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::plus::common_datapages::BatteryStatusField;
+use crate::plus::common::datapages::BatteryStatusField;
 use ant_derive::DataPage;
 use packed_struct::prelude::*;
 

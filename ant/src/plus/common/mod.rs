@@ -6,16 +6,5 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::time::Duration;
-
-pub const NETWORK_RF_FREQUENCY: u8 = 57;
-
-pub const fn duration_to_search_timeout(t: Duration) -> u8 {
-    // Scale up by 10 to avoid floating point math as ratio is 2.5s to 1 count
-    ((t.as_secs() * 10) / (25)) as u8
-}
-
-pub mod common;
-pub mod profiles;
-#[cfg(feature = "alloc")]
-pub mod router;
+pub mod datapages;
+pub mod helpers;

@@ -6,20 +6,18 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::fields::{ChannelType, DeviceType, TransmissionType, Wildcard};
-use crate::messages::{
-    AcknowledgedData, AntMessage, AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency,
-    CloseChannel, OpenChannel, RxMessageType, SearchTimeout, TxMessage, BroadcastData
-};
-use crate::plus::common_datapages::{ModeSettings, RequestDataPage, MANUFACTURER_SPECIFIC_RANGE};
+use crate::fields::{TransmissionChannelType, TransmissionGlobalDataPages};
+use crate::messages::{AcknowledgedData, AntMessage, BroadcastData, RxMessageType, TxMessage};
+use crate::plus::common::datapages::{ModeSettings, RequestDataPage, MANUFACTURER_SPECIFIC_RANGE};
+use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
 use crate::plus::profiles::heart_rate::{
     BatteryStatus, Capabilities, CumulativeOperatingTime, DataPageNumbers, DefaultDataPage,
     DeviceInformation, ManufacturerInformation, ManufacturerSpecific, PreviousHeartBeat,
     ProductInformation, SwimIntervalSummary, DATA_PAGE_NUMBER_MASK,
 };
-
 use crate::plus::router::{Channel, ChannelAssignment};
 use crate::plus::{duration_to_search_timeout, NETWORK_RF_FREQUENCY};
+
 use packed_struct::{PackedStruct, PrimitiveEnum};
 
 use std::time::Duration;
@@ -44,56 +42,45 @@ pub enum TxDataPages {
     ManufacturerSpecific(ManufacturerSpecific),
 }
 
-enum ConfigureState {
-    Assign,
-    Period,
-    Id,
-    Rf,
-    Timeout,
-    Done,
-}
-
-enum ChannelStateCommand {
-    Open,
-    Close,
-}
-
 pub struct HeartRateDisplay {
-    channel: ChannelAssignment,
-    device_number: u16,
-    transmission_type: TransmissionType,
-    network_key_index: u8,
+    msg_handler: MessageHandler,
     rx_message_callback: Option<fn(&AntMessage)>,
     rx_datapage_callback: Option<fn(Result<RxDataPages, HeartRateError>)>,
-    configure_state: ConfigureState,
-    set_channel_state: Option<ChannelStateCommand>,
-    pending_datapage: Option<TxMessage>,
 }
 
+const HR_REFERENCE: ProfileReference = ProfileReference {
+    // TODO type device_type
+    device_type: 120,
+    channel_type: TransmissionChannelType::IndependentChannel,
+    global_datapages_used: TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+    radio_frequency: NETWORK_RF_FREQUENCY,
+    timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
+    channel_period: 8070,
+};
+
 impl HeartRateDisplay {
-    pub fn new(device: Option<(u16, Option<TransmissionType>)>, ant_plus_key_index: u8) -> Self {
-        let device = device.unwrap_or((0, None));
+    pub fn new(device: Option<(u16, TransmissionTypeAssignment)>, ant_plus_key_index: u8) -> Self {
+        let device = device.unwrap_or((0, TransmissionTypeAssignment::Wildcard()));
         let device_number = device.0;
-        let transmission_type = device.1.unwrap_or_else(TransmissionType::new_wildcard);
+        let transmission_type = device.1;
         Self {
-            channel: ChannelAssignment::UnAssigned(),
-            device_number,
-            transmission_type,
-            network_key_index: ant_plus_key_index,
             rx_message_callback: None,
             rx_datapage_callback: None,
-            configure_state: ConfigureState::Assign,
-            set_channel_state: None,
-            pending_datapage: None,
+            msg_handler: MessageHandler::new(
+                device_number,
+                transmission_type,
+                ant_plus_key_index,
+                &HR_REFERENCE,
+            ),
         }
     }
 
     pub fn open(&mut self) {
-        self.set_channel_state = Some(ChannelStateCommand::Open);
+        self.msg_handler.open();
     }
 
     pub fn close(&mut self) {
-        self.set_channel_state = Some(ChannelStateCommand::Close);
+        self.msg_handler.close();
     }
 
     pub fn set_rx_message_callback(&mut self, f: Option<fn(&AntMessage)>) {
@@ -163,25 +150,28 @@ impl HeartRateDisplay {
     }
 
     pub fn send_datapage(&mut self, dp: TxDataPages, use_ack: bool) -> Result<(), HeartRateError> {
-        if self.pending_datapage.is_some() {
+        if self.msg_handler.is_pending() {
             return Err(HeartRateError::PageAlreadyPending());
         }
-        let channel = match self.channel {
+        let channel = match self.msg_handler.get_channel() {
             ChannelAssignment::UnAssigned() => return Err(HeartRateError::NotAssociated()),
             ChannelAssignment::Assigned(channel) => channel,
         };
         let data = match dp {
             TxDataPages::RequestDataPage(rd) => {
-                self.pending_datapage = Some(AcknowledgedData::new(channel, rd.pack()?).into());
+                self.msg_handler
+                    .set_sending(AcknowledgedData::new(channel, rd.pack()?).into());
                 return Ok(());
             }
             TxDataPages::ModeSettings(ms) => ms.pack(),
             TxDataPages::ManufacturerSpecific(ms) => ms.pack(),
         }?;
         if use_ack {
-            self.pending_datapage = Some(AcknowledgedData::new(channel, data).into());
+            self.msg_handler
+                .set_sending(AcknowledgedData::new(channel, data).into());
         } else {
-            self.pending_datapage = Some(BroadcastData::new(channel, data).into());
+            self.msg_handler
+                .set_sending(BroadcastData::new(channel, data).into());
         }
         Ok(())
     }
@@ -197,78 +187,18 @@ impl Channel for HeartRateDisplay {
             RxMessageType::AcknowledgedData(msg) => self.handle_dp(&msg.payload.data),
             _ => (),
         }
+        self.msg_handler.receive_message(msg);
     }
 
     fn send_message(&mut self) -> Option<TxMessage> {
-        let channel = match self.channel {
-            ChannelAssignment::UnAssigned() => return None,
-            ChannelAssignment::Assigned(channel) => channel,
-        };
-
-        match self.configure_state {
-            ConfigureState::Assign => {
-                self.configure_state = ConfigureState::Period;
-                return Some(
-                    AssignChannel::new(
-                        channel,
-                        ChannelType::BidirectionalSlave,
-                        self.network_key_index,
-                        None,
-                    )
-                    .into(),
-                );
-            }
-            ConfigureState::Period => {
-                self.configure_state = ConfigureState::Id;
-                // TODO const the period
-                return Some(ChannelPeriod::new(channel, 8070).into());
-            }
-            ConfigureState::Id => {
-                self.configure_state = ConfigureState::Rf;
-                return Some(
-                    ChannelId::new(
-                        channel,
-                        self.device_number,
-                        DeviceType::new(120.into(), false),
-                        self.transmission_type,
-                    )
-                    .into(),
-                ); // TODO type devicetype
-            }
-            ConfigureState::Rf => {
-                self.configure_state = ConfigureState::Timeout;
-                return Some(ChannelRfFrequency::new(channel, NETWORK_RF_FREQUENCY).into());
-            }
-            ConfigureState::Timeout => {
-                self.configure_state = ConfigureState::Done;
-                return Some(
-                    SearchTimeout::new(
-                        channel,
-                        duration_to_search_timeout(Duration::from_secs(30)),
-                    )
-                    .into(),
-                );
-            }
-            ConfigureState::Done => (),
-        };
-        if let Some(command) = &self.set_channel_state {
-            let msg = match command {
-                ChannelStateCommand::Open => OpenChannel::new(channel).into(),
-                ChannelStateCommand::Close => CloseChannel::new(channel).into(),
-            };
-            self.set_channel_state = None;
-            return Some(msg);
-        };
-        self.pending_datapage.take()
+        self.msg_handler.send_message()
     }
 
     fn set_channel(&mut self, channel: ChannelAssignment) {
-        self.channel = channel;
-        self.configure_state = ConfigureState::Assign;
+        self.msg_handler.set_channel(channel);
     }
 }
 
-// TODO extend to user errors
 #[derive(Debug, Clone)]
 pub enum HeartRateError {
     BytePatternError(packed_struct::PackingError),
