@@ -8,10 +8,10 @@
 
 use crate::fields::{ChannelType, DeviceType, TransmissionType, Wildcard};
 use crate::messages::{
-    AntMessage, AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, CloseChannel,
-    OpenChannel, RxMessageType, SearchTimeout, TxMessage,
+    AcknowledgedData, AntMessage, AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency,
+    CloseChannel, OpenChannel, RxMessageType, SearchTimeout, TxMessage, BroadcastData
 };
-use crate::plus::common_datapages::MANUFACTURER_SPECIFIC_RANGE;
+use crate::plus::common_datapages::{ModeSettings, RequestDataPage, MANUFACTURER_SPECIFIC_RANGE};
 use crate::plus::profiles::heart_rate::{
     BatteryStatus, Capabilities, CumulativeOperatingTime, DataPageNumbers, DefaultDataPage,
     DeviceInformation, ManufacturerInformation, ManufacturerSpecific, PreviousHeartBeat,
@@ -25,7 +25,7 @@ use packed_struct::{PackedStruct, PrimitiveEnum};
 use std::time::Duration;
 
 #[derive(PartialEq, Copy, Clone, Debug)]
-pub enum DataPages {
+pub enum RxDataPages {
     DefaultDataPage(DefaultDataPage),
     CumulativeOperatingTime(CumulativeOperatingTime),
     ManufacturerInformation(ManufacturerInformation),
@@ -35,6 +35,12 @@ pub enum DataPages {
     Capabilities(Capabilities),
     BatteryStatus(BatteryStatus),
     DeviceInformation(DeviceInformation),
+    ManufacturerSpecific(ManufacturerSpecific),
+}
+
+pub enum TxDataPages {
+    RequestDataPage(RequestDataPage),
+    ModeSettings(ModeSettings),
     ManufacturerSpecific(ManufacturerSpecific),
 }
 
@@ -58,9 +64,10 @@ pub struct HeartRateDisplay {
     transmission_type: TransmissionType,
     network_key_index: u8,
     rx_message_callback: Option<fn(&AntMessage)>,
-    rx_datapage_callback: Option<fn(Result<DataPages, HeartRateError>)>,
+    rx_datapage_callback: Option<fn(Result<RxDataPages, HeartRateError>)>,
     configure_state: ConfigureState,
     set_channel_state: Option<ChannelStateCommand>,
+    pending_datapage: Option<TxMessage>,
 }
 
 impl HeartRateDisplay {
@@ -77,6 +84,7 @@ impl HeartRateDisplay {
             rx_datapage_callback: None,
             configure_state: ConfigureState::Assign,
             set_channel_state: None,
+            pending_datapage: None,
         }
     }
 
@@ -92,7 +100,7 @@ impl HeartRateDisplay {
         self.rx_message_callback = f;
     }
 
-    pub fn set_rx_datapage_callback(&mut self, f: Option<fn(Result<DataPages, HeartRateError>)>) {
+    pub fn set_rx_datapage_callback(&mut self, f: Option<fn(Result<RxDataPages, HeartRateError>)>) {
         self.rx_datapage_callback = f;
     }
 
@@ -108,38 +116,38 @@ impl HeartRateDisplay {
         }
     }
 
-    fn parse_dp(&mut self, data: &[u8; 8]) -> Result<DataPages, HeartRateError> {
+    fn parse_dp(&mut self, data: &[u8; 8]) -> Result<RxDataPages, HeartRateError> {
         let dp_num = data[0] & DATA_PAGE_NUMBER_MASK;
         if let Some(dp) = DataPageNumbers::from_primitive(dp_num) {
             let parsed = match dp {
                 DataPageNumbers::DefaultDataPage => {
-                    DataPages::DefaultDataPage(DefaultDataPage::unpack(data)?)
+                    RxDataPages::DefaultDataPage(DefaultDataPage::unpack(data)?)
                 }
                 DataPageNumbers::CumulativeOperatingTime => {
-                    DataPages::CumulativeOperatingTime(CumulativeOperatingTime::unpack(data)?)
+                    RxDataPages::CumulativeOperatingTime(CumulativeOperatingTime::unpack(data)?)
                 }
                 DataPageNumbers::ManufacturerInformation => {
-                    DataPages::ManufacturerInformation(ManufacturerInformation::unpack(data)?)
+                    RxDataPages::ManufacturerInformation(ManufacturerInformation::unpack(data)?)
                 }
                 DataPageNumbers::ProductInformation => {
-                    DataPages::ProductInformation(ProductInformation::unpack(data)?)
+                    RxDataPages::ProductInformation(ProductInformation::unpack(data)?)
                 }
                 DataPageNumbers::PreviousHeartBeat => {
-                    DataPages::PreviousHeartBeat(PreviousHeartBeat::unpack(data)?)
+                    RxDataPages::PreviousHeartBeat(PreviousHeartBeat::unpack(data)?)
                 }
                 DataPageNumbers::SwimIntervalSummary => {
-                    DataPages::SwimIntervalSummary(SwimIntervalSummary::unpack(data)?)
+                    RxDataPages::SwimIntervalSummary(SwimIntervalSummary::unpack(data)?)
                 }
                 DataPageNumbers::Capabilities => {
-                    DataPages::Capabilities(Capabilities::unpack(data)?)
+                    RxDataPages::Capabilities(Capabilities::unpack(data)?)
                 }
                 DataPageNumbers::BatteryStatus => {
-                    DataPages::BatteryStatus(BatteryStatus::unpack(data)?)
+                    RxDataPages::BatteryStatus(BatteryStatus::unpack(data)?)
                 }
                 DataPageNumbers::DeviceInformation => {
-                    DataPages::DeviceInformation(DeviceInformation::unpack(data)?)
+                    RxDataPages::DeviceInformation(DeviceInformation::unpack(data)?)
                 }
-                // Add all valid pages below if they are invalid in this direction
+                // Add all valid profile specific pages below if they are invalid in this direction
                 DataPageNumbers::HRFeatureCommand => {
                     return Err(HeartRateError::UnsupportedDataPage(dp_num))
                 }
@@ -147,11 +155,35 @@ impl HeartRateDisplay {
             return Ok(parsed);
         }
         if MANUFACTURER_SPECIFIC_RANGE.contains(&dp_num) {
-            return Ok(DataPages::ManufacturerSpecific(
+            return Ok(RxDataPages::ManufacturerSpecific(
                 ManufacturerSpecific::unpack(data)?,
             ));
         }
         Err(HeartRateError::UnsupportedDataPage(dp_num))
+    }
+
+    pub fn send_datapage(&mut self, dp: TxDataPages, use_ack: bool) -> Result<(), HeartRateError> {
+        if self.pending_datapage.is_some() {
+            return Err(HeartRateError::PageAlreadyPending());
+        }
+        let channel = match self.channel {
+            ChannelAssignment::UnAssigned() => return Err(HeartRateError::NotAssociated()),
+            ChannelAssignment::Assigned(channel) => channel,
+        };
+        let data = match dp {
+            TxDataPages::RequestDataPage(rd) => {
+                self.pending_datapage = Some(AcknowledgedData::new(channel, rd.pack()?).into());
+                return Ok(());
+            }
+            TxDataPages::ModeSettings(ms) => ms.pack(),
+            TxDataPages::ManufacturerSpecific(ms) => ms.pack(),
+        }?;
+        if use_ack {
+            self.pending_datapage = Some(AcknowledgedData::new(channel, data).into());
+        } else {
+            self.pending_datapage = Some(BroadcastData::new(channel, data).into());
+        }
+        Ok(())
     }
 }
 
@@ -176,52 +208,58 @@ impl Channel for HeartRateDisplay {
         match self.configure_state {
             ConfigureState::Assign => {
                 self.configure_state = ConfigureState::Period;
-                return Some(TxMessage::AssignChannel(AssignChannel::new(
-                    channel,
-                    ChannelType::BidirectionalSlave,
-                    self.network_key_index,
-                    None,
-                )));
+                return Some(
+                    AssignChannel::new(
+                        channel,
+                        ChannelType::BidirectionalSlave,
+                        self.network_key_index,
+                        None,
+                    )
+                    .into(),
+                );
             }
             ConfigureState::Period => {
                 self.configure_state = ConfigureState::Id;
                 // TODO const the period
-                return Some(TxMessage::ChannelPeriod(ChannelPeriod::new(channel, 8070)));
+                return Some(ChannelPeriod::new(channel, 8070).into());
             }
             ConfigureState::Id => {
                 self.configure_state = ConfigureState::Rf;
-                return Some(TxMessage::ChannelId(ChannelId::new(
-                    channel,
-                    self.device_number,
-                    DeviceType::new(120.into(), false),
-                    self.transmission_type,
-                ))); // TODO type devicetype
+                return Some(
+                    ChannelId::new(
+                        channel,
+                        self.device_number,
+                        DeviceType::new(120.into(), false),
+                        self.transmission_type,
+                    )
+                    .into(),
+                ); // TODO type devicetype
             }
             ConfigureState::Rf => {
                 self.configure_state = ConfigureState::Timeout;
-                return Some(TxMessage::ChannelRfFrequency(ChannelRfFrequency::new(
-                    channel,
-                    NETWORK_RF_FREQUENCY,
-                )));
+                return Some(ChannelRfFrequency::new(channel, NETWORK_RF_FREQUENCY).into());
             }
             ConfigureState::Timeout => {
                 self.configure_state = ConfigureState::Done;
-                return Some(TxMessage::SearchTimeout(SearchTimeout::new(
-                    channel,
-                    duration_to_search_timeout(Duration::from_secs(30)),
-                )));
+                return Some(
+                    SearchTimeout::new(
+                        channel,
+                        duration_to_search_timeout(Duration::from_secs(30)),
+                    )
+                    .into(),
+                );
             }
             ConfigureState::Done => (),
-        }
+        };
         if let Some(command) = &self.set_channel_state {
             let msg = match command {
-                ChannelStateCommand::Open => TxMessage::OpenChannel(OpenChannel::new(channel)),
-                ChannelStateCommand::Close => TxMessage::CloseChannel(CloseChannel::new(channel)),
+                ChannelStateCommand::Open => OpenChannel::new(channel).into(),
+                ChannelStateCommand::Close => CloseChannel::new(channel).into(),
             };
             self.set_channel_state = None;
             return Some(msg);
-        }
-        None
+        };
+        self.pending_datapage.take()
     }
 
     fn set_channel(&mut self, channel: ChannelAssignment) {
@@ -235,6 +273,8 @@ impl Channel for HeartRateDisplay {
 pub enum HeartRateError {
     BytePatternError(packed_struct::PackingError),
     UnsupportedDataPage(u8),
+    PageAlreadyPending(),
+    NotAssociated(),
 }
 
 impl From<packed_struct::PackingError> for HeartRateError {
