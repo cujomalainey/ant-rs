@@ -8,6 +8,7 @@
 
 use crate::drivers::*;
 use crate::messages::*;
+use crate::plus::{Channel, ChannelAssignment};
 
 use std::cell::{Cell, RefCell};
 use std::marker::PhantomData;
