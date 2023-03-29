@@ -50,28 +50,11 @@ pub enum NetworkKey {
     Custom(u8),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ChannelAssignment {
-    Assigned(u8),
-    UnAssigned(),
-}
-
 // This in theory is infinite, but its what the current hardware limit is.
 /// Highest known supported channel count on a ANT device
 pub const MAX_CHANNELS: usize = 15;
 /// Highest known supported network count on a ANT device
 pub const MAX_NETWORKS: usize = 8;
-
-/// Channel is the trait all channels must implement to register with the router
-pub trait Channel {
-    /// All channels must be able to recieve messages and must be infalliable. If you have an
-    /// error with a recieved message, deal with it internally, the router does not care.
-    fn receive_message(&mut self, msg: &AntMessage);
-    /// Yield the next message the profile wishes to send
-    fn send_message(&mut self) -> Option<TxMessage>;
-    /// Assign channel from associated router or manually if not using a router
-    fn set_channel(&mut self, channel: ChannelAssignment);
-}
 
 type SharedChannel = Rc<RefCell<dyn Channel>>;
 

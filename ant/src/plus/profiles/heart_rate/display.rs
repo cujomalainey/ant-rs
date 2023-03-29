@@ -15,7 +15,7 @@ use crate::plus::profiles::heart_rate::{
     DeviceInformation, ManufacturerInformation, ManufacturerSpecific, PreviousHeartBeat,
     ProductInformation, SwimIntervalSummary, DATA_PAGE_NUMBER_MASK,
 };
-use crate::plus::router::{Channel, ChannelAssignment};
+use crate::plus::{Channel, ChannelAssignment};
 use crate::plus::{duration_to_search_timeout, NETWORK_RF_FREQUENCY};
 
 use packed_struct::{PackedStruct, PrimitiveEnum};

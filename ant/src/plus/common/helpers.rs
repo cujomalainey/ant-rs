@@ -14,7 +14,7 @@ use crate::messages::{
     AntMessage, AssignChannel, ChannelId, ChannelPeriod, ChannelStatus, ChannelEvent, ChannelResponse, ChannelRfFrequency,
     CloseChannel, OpenChannel, RxMessageType, SearchTimeout, TxMessage,
 };
-use crate::plus::router::ChannelAssignment;
+use crate::plus::ChannelAssignment;
 use packed_struct::prelude::{packed_bits, Integer};
 
 enum ConfigureState {
