@@ -8,10 +8,10 @@
 
 use crate::fields::{
     ChannelType, DeviceType, TransmissionChannelType, TransmissionGlobalDataPages,
-    TransmissionType, Wildcard,
+    TransmissionType, Wildcard, MessageCode,
 };
 use crate::messages::{
-    AntMessage, AssignChannel, ChannelId, ChannelPeriod, ChannelResponse, ChannelRfFrequency,
+    AntMessage, AssignChannel, ChannelId, ChannelPeriod, ChannelStatus, ChannelEvent, ChannelResponse, ChannelRfFrequency,
     CloseChannel, OpenChannel, RxMessageType, SearchTimeout, TxMessage,
 };
 use crate::plus::router::ChannelAssignment;
@@ -169,17 +169,36 @@ impl MessageHandler {
     pub fn receive_message(&mut self, msg: &AntMessage) {
         match &msg.message {
             RxMessageType::ChannelResponse(msg) => self.handle_response(msg),
+            RxMessageType::ChannelEvent(msg) => self.handle_event(msg),
             RxMessageType::ChannelId(msg) => self.handle_id(msg),
+            RxMessageType::ChannelStatus(msg) => self.handle_status(msg),
+            _ => (),
+        }
+    }
+
+    fn handle_status(&mut self, msg: &ChannelStatus) {
+        match msg.channel_state {
             _ => (),
         }
     }
 
     fn handle_response(&mut self, msg: &ChannelResponse) {
-        // TODO
+        match msg.message_code {
+            _ => (),
+        }
+    }
+
+    fn handle_event(&mut self, msg: &ChannelEvent) {
+        match msg.payload.message_code {
+            MessageCode::EventChannelClosed => (),
+            MessageCode::EventRxFailGoToSearch => (),
+            _ => (),
+        }
     }
 
     fn handle_id(&mut self, msg: &ChannelId) {
-        // TODO
+        self.device_number = msg.device_number;
+        // TODO copy rest of state
     }
 
     pub fn open(&mut self) {
