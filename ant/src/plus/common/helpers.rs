@@ -7,12 +7,13 @@
 // except according to those terms.
 
 use crate::fields::{
-    ChannelType, DeviceType, TransmissionChannelType, TransmissionGlobalDataPages,
-    TransmissionType, Wildcard, MessageCode,
+    ChannelType, DeviceType, MessageCode, TransmissionChannelType, TransmissionGlobalDataPages,
+    TransmissionType, Wildcard,
 };
 use crate::messages::{
-    AntMessage, AssignChannel, ChannelId, ChannelPeriod, ChannelStatus, ChannelEvent, ChannelResponse, ChannelRfFrequency,
-    CloseChannel, OpenChannel, RxMessageType, SearchTimeout, TxMessage,
+    AntMessage, AssignChannel, ChannelEvent, ChannelId, ChannelPeriod, ChannelResponse,
+    ChannelRfFrequency, ChannelStatus, CloseChannel, OpenChannel, RxMessageType, SearchTimeout,
+    TxMessage,
 };
 use crate::plus::ChannelAssignment;
 use packed_struct::prelude::{packed_bits, Integer};

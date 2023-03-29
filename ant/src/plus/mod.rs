@@ -6,8 +6,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::time::Duration;
 use crate::messages::{AntMessage, TxMessage};
+use core::time::Duration;
 
 pub const NETWORK_RF_FREQUENCY: u8 = 57;
 
