@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::fields::{DeviceType, TransmissionType};
+use crate::messages::config::{DeviceType, TransmissionType};
 use ant_derive::DataPage;
 use packed_struct::prelude::*;
 

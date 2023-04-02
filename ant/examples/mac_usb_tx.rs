@@ -7,7 +7,14 @@
 // except according to those terms.
 
 use ant::drivers::*;
-use ant::messages::*;
+use ant::messages::channel::MessageCode;
+use ant::messages::config::{
+    AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
+    TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
+};
+use ant::messages::control::{OpenChannel, ResetSystem};
+use ant::messages::data::BroadcastData;
+use ant::messages::RxMessage;
 
 use dialoguer::Select;
 use rusb::{Device, DeviceList};
@@ -72,7 +79,7 @@ fn main() -> std::io::Result<()> {
         match driver.get_message() {
             Ok(None) => (),
             Ok(Some(msg)) => match &msg.message {
-                RxMessageType::ChannelEvent(msg) => match msg.payload.message_code {
+                RxMessage::ChannelEvent(msg) => match msg.payload.message_code {
                     MessageCode::EventTx => {
                         data.payload.data[0] = data.payload.data[0].overflowing_add(1).0;
                         println!("Sending [0][0][0][0][0][0][0][{}]!", data.payload.data[0]);

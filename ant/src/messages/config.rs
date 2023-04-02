@@ -6,277 +6,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::drivers::DriverError;
-pub use crate::fields::*;
+use crate::messages::{AntAutoPackWithExtention, TransmitableMessage, TxMessage, TxMessageId};
 use ant_derive::AntTx;
-use arrayvec::ArrayVec;
-use const_utils::{max, min};
-use konst::{option::unwrap_or, primitive::parse_usize, unwrap_ctx};
 use packed_struct::prelude::*;
-use std::convert::{TryFrom, TryInto};
 
-// TODO make this crash compilation if out of bounds rather than silently correct
-// TODO skip this if NVM is enabled
-const ADVANCED_BURST_BUFFER_SIZE: usize = min(
-    max(
-        unwrap_ctx!(parse_usize(unwrap_or!(
-            option_env!("ADV_BURST_BUF_SIZE"),
-            "64"
-        ))),
-        24,
-    ),
-    254,
-);
-pub(crate) const MAX_MESSAGE_DATA_SIZE: usize = ADVANCED_BURST_BUFFER_SIZE + 1;
-
-// TODO remove "type" suffix
-/// All supported RX messages
-#[derive(Clone, PartialEq, Debug)]
-pub enum RxMessageType {
-    // Notification Messages
-    StartUpMessage(StartUpMessage),
-    // #define SERIAL_ERROR_MESSAGE                0xAE
-    // Data Messages
-    BroadcastData(BroadcastData),
-    AcknowledgedData(AcknowledgedData),
-    BurstTransferData(BurstTransferData),
-    AdvancedBurstData(AdvancedBurstData),
-    // Channel Messages
-    ChannelEvent(ChannelEvent),
-    ChannelResponse(ChannelResponse),
-    SerialErrorMessage(SerialErrorMessage),
-    // Requested Response Messages
-    ChannelStatus(ChannelStatus),
-    ChannelId(ChannelId),
-    AntVersion(AntVersion),
-    Capabilities(Capabilities),
-    SerialNumber(SerialNumber),
-    EventBufferConfiguration(EventBufferConfiguration),
-    AdvancedBurstCapabilities(AdvancedBurstCapabilities),
-    AdvancedBurstConfiguration(AdvancedBurstCurrentConfiguration),
-    EventFilter(EventFilter),
-    SelectiveDataUpdateMaskSetting(SelectiveDataUpdateMaskSetting),
-    UserNvm(UserNvm),
-    EncryptionModeParameters(EncryptionModeParameters),
-    // Extended Data Messages (Legacy)
-    // #define EXTENDED_BROADCAST_DATA             0x5D
-    // #define EXTENDED_ACKNOWLEDGED_DATA          0x5E
-    // #define EXTENDED_BURST_DATA                 0x5F
-}
-
-pub enum TxMessage {
-    UnAssignChannel(UnAssignChannel),
-    AssignChannel(AssignChannel),
-    ChannelId(ChannelId),
-    ChannelPeriod(ChannelPeriod),
-    SearchTimeout(SearchTimeout),
-    ChannelRfFrequency(ChannelRfFrequency),
-    SetNetworkKey(SetNetworkKey),
-    TransmitPower(TransmitPower),
-    SearchWaveform(SearchWaveform),
-    AddChannelIdToList(AddChannelIdToList),
-    AddEncryptionIdToList(AddEncryptionIdToList),
-    ConfigIdList(ConfigIdList),
-    ConfigEncryptionIdList(ConfigEncryptionIdList),
-    SetChannelTransmitPower(SetChannelTransmitPower),
-    LowPrioritySearchTimeout(LowPrioritySearchTimeout),
-    SerialNumberSetChannelId(SerialNumberSetChannelId),
-    EnableExtRxMessages(EnableExtRxMessages),
-    EnableLed(EnableLed),
-    CrystalEnable(CrystalEnable),
-    LibConfig(LibConfig),
-    FrequencyAgility(FrequencyAgility),
-    ProximitySearch(ProximitySearch),
-    ConfigureEventBuffer(ConfigureEventBuffer),
-    ChannelSearchPriority(ChannelSearchPriority),
-    Set128BitNetworkKey(Set128BitNetworkKey),
-    HighDutySearch(HighDutySearch),
-    ConfigureAdvancedBurst(ConfigureAdvancedBurst),
-    ConfigureEventFilter(ConfigureEventFilter),
-    ConfigureSelectiveDataUpdates(ConfigureSelectiveDataUpdates),
-    SetSelectiveDataUpdateMask(SetSelectiveDataUpdateMask),
-    // ConfigureUserNvm(ConfigureUserNvm),
-    EnableSingleChannelEncryption(EnableSingleChannelEncryption),
-    SetEncryptionKey(SetEncryptionKey),
-    SetEncryptionInfoEncryptionId(SetEncryptionInfoEncryptionId),
-    SetEncryptionInfoRandomSeed(SetEncryptionInfoRandomSeed),
-    SetEncryptionInfoUserInformationString(SetEncryptionInfoUserInformationString),
-    ChannelSearchSharing(ChannelSearchSharing),
-    LoadEncryptionKeyFromNvm(LoadEncryptionKeyFromNvm),
-    StoreEncryptionKeyInNvm(StoreEncryptionKeyInNvm),
-    // SetUsbDescriptorString(SetUsbDescriptorString),
-    ResetSystem(ResetSystem),
-    OpenChannel(OpenChannel),
-    CloseChannel(CloseChannel),
-    RequestMessage(RequestMessage),
-    // OpenRxScanMode(OpenRxScanMode),
-    SleepMessage(SleepMessage),
-    BroadcastData(BroadcastData),
-    AcknowledgedData(AcknowledgedData),
-    BurstTransferData(BurstTransferData),
-    AdvancedBurstData(AdvancedBurstData),
-    CwInit(CwInit),
-    CwTest(CwTest),
-}
-
-impl AntTxMessageType for TxMessage {
-    fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
-        match self {
-            TxMessage::UnAssignChannel(uc) => uc.serialize_message(buf),
-            TxMessage::AssignChannel(ac) => ac.serialize_message(buf),
-            TxMessage::ChannelId(id) => id.serialize_message(buf),
-            TxMessage::ChannelPeriod(cp) => cp.serialize_message(buf),
-            TxMessage::SearchTimeout(st) => st.serialize_message(buf),
-            TxMessage::ChannelRfFrequency(cr) => cr.serialize_message(buf),
-            TxMessage::SetNetworkKey(cc) => cc.serialize_message(buf),
-            TxMessage::TransmitPower(tp) => tp.serialize_message(buf),
-            TxMessage::SearchWaveform(sw) => sw.serialize_message(buf),
-            TxMessage::AddChannelIdToList(ac) => ac.serialize_message(buf),
-            TxMessage::AddEncryptionIdToList(ae) => ae.serialize_message(buf),
-            TxMessage::ConfigIdList(cl) => cl.serialize_message(buf),
-            TxMessage::ConfigEncryptionIdList(ce) => ce.serialize_message(buf),
-            TxMessage::SetChannelTransmitPower(sc) => sc.serialize_message(buf),
-            TxMessage::LowPrioritySearchTimeout(lp) => lp.serialize_message(buf),
-            TxMessage::SerialNumberSetChannelId(sn) => sn.serialize_message(buf),
-            TxMessage::EnableExtRxMessages(ee) => ee.serialize_message(buf),
-            TxMessage::EnableLed(el) => el.serialize_message(buf),
-            TxMessage::CrystalEnable(ce) => ce.serialize_message(buf),
-            TxMessage::LibConfig(lc) => lc.serialize_message(buf),
-            TxMessage::FrequencyAgility(fa) => fa.serialize_message(buf),
-            TxMessage::ProximitySearch(ps) => ps.serialize_message(buf),
-            TxMessage::ConfigureEventBuffer(ce) => ce.serialize_message(buf),
-            TxMessage::ChannelSearchPriority(cs) => cs.serialize_message(buf),
-            TxMessage::Set128BitNetworkKey(sb) => sb.serialize_message(buf),
-            TxMessage::HighDutySearch(hd) => hd.serialize_message(buf),
-            TxMessage::ConfigureAdvancedBurst(ca) => ca.serialize_message(buf),
-            TxMessage::ConfigureEventFilter(ce) => ce.serialize_message(buf),
-            TxMessage::ConfigureSelectiveDataUpdates(cs) => cs.serialize_message(buf),
-            TxMessage::SetSelectiveDataUpdateMask(ss) => ss.serialize_message(buf),
-            // ConfigureUserNvm(ConfigureUserNvm),
-            TxMessage::EnableSingleChannelEncryption(es) => es.serialize_message(buf),
-            TxMessage::SetEncryptionKey(se) => se.serialize_message(buf),
-            TxMessage::SetEncryptionInfoEncryptionId(se) => se.serialize_message(buf),
-            TxMessage::SetEncryptionInfoRandomSeed(se) => se.serialize_message(buf),
-            TxMessage::SetEncryptionInfoUserInformationString(se) => se.serialize_message(buf),
-            TxMessage::ChannelSearchSharing(cs) => cs.serialize_message(buf),
-            TxMessage::LoadEncryptionKeyFromNvm(le) => le.serialize_message(buf),
-            TxMessage::StoreEncryptionKeyInNvm(se) => se.serialize_message(buf),
-            // SetUsbDescriptorString(SetUsbDescriptorString),
-            TxMessage::ResetSystem(rs) => rs.serialize_message(buf),
-            TxMessage::OpenChannel(oc) => oc.serialize_message(buf),
-            TxMessage::CloseChannel(cc) => cc.serialize_message(buf),
-            TxMessage::RequestMessage(rm) => rm.serialize_message(buf),
-            // TxMessage::OpenRxScanMode(or) => or.serialize_message(buf),
-            TxMessage::SleepMessage(sm) => sm.serialize_message(buf),
-            TxMessage::BroadcastData(bd) => bd.serialize_message(buf),
-            TxMessage::AcknowledgedData(ad) => ad.serialize_message(buf),
-            TxMessage::BurstTransferData(bt) => bt.serialize_message(buf),
-            TxMessage::AdvancedBurstData(ab) => ab.serialize_message(buf),
-            TxMessage::CwInit(ci) => ci.serialize_message(buf),
-            TxMessage::CwTest(ct) => ct.serialize_message(buf),
-        }
-    }
-    fn get_tx_msg_id(&self) -> TxMessageId {
-        match self {
-            TxMessage::UnAssignChannel(uc) => uc.get_tx_msg_id(),
-            TxMessage::AssignChannel(ac) => ac.get_tx_msg_id(),
-            TxMessage::ChannelId(id) => id.get_tx_msg_id(),
-            TxMessage::ChannelPeriod(cp) => cp.get_tx_msg_id(),
-            TxMessage::SearchTimeout(st) => st.get_tx_msg_id(),
-            TxMessage::ChannelRfFrequency(cr) => cr.get_tx_msg_id(),
-            TxMessage::SetNetworkKey(cc) => cc.get_tx_msg_id(),
-            TxMessage::TransmitPower(tp) => tp.get_tx_msg_id(),
-            TxMessage::SearchWaveform(sw) => sw.get_tx_msg_id(),
-            TxMessage::AddChannelIdToList(ac) => ac.get_tx_msg_id(),
-            TxMessage::AddEncryptionIdToList(ae) => ae.get_tx_msg_id(),
-            TxMessage::ConfigIdList(cl) => cl.get_tx_msg_id(),
-            TxMessage::ConfigEncryptionIdList(ce) => ce.get_tx_msg_id(),
-            TxMessage::SetChannelTransmitPower(sc) => sc.get_tx_msg_id(),
-            TxMessage::LowPrioritySearchTimeout(lp) => lp.get_tx_msg_id(),
-            TxMessage::SerialNumberSetChannelId(sn) => sn.get_tx_msg_id(),
-            TxMessage::EnableExtRxMessages(ee) => ee.get_tx_msg_id(),
-            TxMessage::EnableLed(el) => el.get_tx_msg_id(),
-            TxMessage::CrystalEnable(ce) => ce.get_tx_msg_id(),
-            TxMessage::LibConfig(lc) => lc.get_tx_msg_id(),
-            TxMessage::FrequencyAgility(fa) => fa.get_tx_msg_id(),
-            TxMessage::ProximitySearch(ps) => ps.get_tx_msg_id(),
-            TxMessage::ConfigureEventBuffer(ce) => ce.get_tx_msg_id(),
-            TxMessage::ChannelSearchPriority(cs) => cs.get_tx_msg_id(),
-            TxMessage::Set128BitNetworkKey(sb) => sb.get_tx_msg_id(),
-            TxMessage::HighDutySearch(hd) => hd.get_tx_msg_id(),
-            TxMessage::ConfigureAdvancedBurst(ca) => ca.get_tx_msg_id(),
-            TxMessage::ConfigureEventFilter(ce) => ce.get_tx_msg_id(),
-            TxMessage::ConfigureSelectiveDataUpdates(cs) => cs.get_tx_msg_id(),
-            TxMessage::SetSelectiveDataUpdateMask(ss) => ss.get_tx_msg_id(),
-            // ConfigureUserNvm(ConfigureUserNvm),
-            TxMessage::EnableSingleChannelEncryption(es) => es.get_tx_msg_id(),
-            TxMessage::SetEncryptionKey(se) => se.get_tx_msg_id(),
-            TxMessage::SetEncryptionInfoEncryptionId(se) => se.get_tx_msg_id(),
-            TxMessage::SetEncryptionInfoRandomSeed(se) => se.get_tx_msg_id(),
-            TxMessage::SetEncryptionInfoUserInformationString(se) => se.get_tx_msg_id(),
-            TxMessage::ChannelSearchSharing(cs) => cs.get_tx_msg_id(),
-            TxMessage::LoadEncryptionKeyFromNvm(le) => le.get_tx_msg_id(),
-            TxMessage::StoreEncryptionKeyInNvm(se) => se.get_tx_msg_id(),
-            // SetUsbDescriptorString(SetUsbDescriptorString),
-            TxMessage::ResetSystem(rs) => rs.get_tx_msg_id(),
-            TxMessage::OpenChannel(oc) => oc.get_tx_msg_id(),
-            TxMessage::CloseChannel(cc) => cc.get_tx_msg_id(),
-            TxMessage::RequestMessage(rm) => rm.get_tx_msg_id(),
-            // TxMessage::OpenRxScanMode(or) => or.serialize_message(buf),
-            TxMessage::SleepMessage(sm) => sm.get_tx_msg_id(),
-            TxMessage::BroadcastData(bd) => bd.get_tx_msg_id(),
-            TxMessage::AcknowledgedData(ad) => ad.get_tx_msg_id(),
-            TxMessage::BurstTransferData(bt) => bt.get_tx_msg_id(),
-            TxMessage::AdvancedBurstData(ab) => ab.get_tx_msg_id(),
-            TxMessage::CwInit(ci) => ci.get_tx_msg_id(),
-            TxMessage::CwTest(ct) => ct.get_tx_msg_id(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-/// Represents a generic ANT radio message
-pub struct AntMessage {
-    pub header: RxMessageHeader,
-    pub message: RxMessageType,
-    /// XOR of all prior bytes should match this
-    pub checksum: u8,
-}
-
-// TODO remove "ant"
-/// Trait for any TX message type
-pub trait AntTxMessageType {
-    fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError>;
-    fn get_tx_msg_id(&self) -> TxMessageId;
-}
-
-macro_rules! AntAutoPackWithExtention {
-    ($msg_type:ident, $id:expr, $main_field:ident, $ext_field:ident) => {
-        impl AntTxMessageType for $msg_type {
-            fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
-                let data_len = PackedStructSlice::packed_bytes_size(Some(&self.$main_field))?;
-                self.$main_field.pack_to_slice(&mut buf[..data_len])?;
-
-                if let Some(ext) = self.$ext_field {
-                    let ext_len = PackedStructSlice::packed_bytes_size(Some(&ext))?;
-                    ext.pack_to_slice(&mut buf[data_len..data_len + ext_len])?;
-                    return Ok(data_len + ext_len);
-                }
-                Ok(data_len)
-            }
-            fn get_tx_msg_id(&self) -> TxMessageId {
-                $id
-            }
-        }
-        impl From<$msg_type> for TxMessage {
-            fn from(msg: $msg_type) -> TxMessage {
-                TxMessage::$msg_type(msg)
-            }
-        }
-    };
-}
-
-// Message Types
+// Re-export reused types
+pub use crate::messages::requested_response::{EncryptionId, UserInformationString};
 
 /// Represents a UnAssign Channel Message (0x41)
 #[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
@@ -294,6 +29,20 @@ impl UnAssignChannel {
     }
 }
 
+// Note, this is bit shifted 4 bits relative to the offical doc because the field would overlap in
+// the channel status message. The result is the same just a minor mismatch compared to official
+// docs
+#[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq, Default)]
+pub enum ChannelType {
+    #[default]
+    BidirectionalSlave = 0,
+    BidirectionalMaster = 1,
+    SharedBidirectionalSlave = 2,
+    SharedBidirectionalMaster = 3,
+    SharedReceiveOnly = 4,
+    MasterTransmitOnly = 5,
+}
+
 /// Mandatory fields for [AssignChannel] messages
 #[derive(PackedStruct, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
@@ -309,6 +58,25 @@ pub struct AssignChannelData {
     /// Which network key to use, set keys via [SetNetworkKey]
     #[packed_field(bytes = "2")]
     pub network_number: u8,
+}
+
+#[derive(PackedStruct, Clone, Copy, Debug, Default, PartialEq)]
+#[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
+pub struct ExtendedAssignment {
+    #[packed_field(bits = "0")]
+    pub always_search: bool,
+    #[packed_field(bits = "1")]
+    pub ignore_transmission_type: bool,
+    #[packed_field(bits = "2")]
+    pub frequency_agility: bool,
+    #[packed_field(bits = "3")]
+    pub auto_shared_slave: bool,
+    #[packed_field(bits = "4")]
+    pub fast_initiation_mode: bool,
+    #[packed_field(bits = "5")]
+    pub async_tx_mode: bool,
+    #[packed_field(bits = "6:7")]
+    _reserved: ReservedZeroes<packed_bits::Bits2>,
 }
 
 /// Represents a Assign Channel message (0x42)
@@ -342,6 +110,97 @@ impl AssignChannel {
                 ..AssignChannelData::default()
             },
             extended_assignment,
+        }
+    }
+}
+
+#[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug, Default)]
+pub enum TransmissionChannelType {
+    Reserved = 0b00,
+    #[default]
+    IndependentChannel = 0b01,
+    SharedChannel1ByteAddress = 0b10,
+    SharedChannel2ByteAddress = 0b11,
+}
+
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
+pub enum TransmissionGlobalDataPages {
+    #[default]
+    GlobalDataPagesNotUsed = 0,
+    GlobalDataPagesUsed = 1,
+}
+
+#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
+pub struct TransmissionType {
+    #[packed_field(bits = "0:1", ty = "enum")]
+    pub transmission_channel_type: TransmissionChannelType,
+    #[packed_field(bits = "2", ty = "enum")]
+    pub global_datapages_used: TransmissionGlobalDataPages,
+    #[packed_field(bits = "3")]
+    _reserved: ReservedZeroes<packed_bits::Bits1>,
+    // TODO alias this type when https://github.com/hashmismatch/packed_struct.rs/issues/86 is
+    // resolved
+    #[packed_field(bits = "4:7")]
+    pub device_number_extension: Integer<u8, packed_bits::Bits4>,
+}
+
+impl TransmissionType {
+    pub fn new(
+        transmission_channel_type: TransmissionChannelType,
+        global_datapages_used: TransmissionGlobalDataPages,
+        device_number_extension: Integer<u8, packed_bits::Bits4>,
+    ) -> Self {
+        Self {
+            transmission_channel_type,
+            global_datapages_used,
+            device_number_extension,
+            ..TransmissionType::default()
+        }
+    }
+
+    pub fn wildcard(&mut self) {
+        self.transmission_channel_type = TransmissionChannelType::Reserved;
+        self.global_datapages_used = TransmissionGlobalDataPages::GlobalDataPagesNotUsed;
+        self.device_number_extension = 0.into();
+    }
+
+    pub fn new_wildcard() -> Self {
+        Self {
+            transmission_channel_type: TransmissionChannelType::Reserved,
+            global_datapages_used: TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+            device_number_extension: 0.into(),
+            ..TransmissionType::default()
+        }
+    }
+}
+
+#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
+pub struct DeviceType {
+    #[packed_field(bits = "0:6")]
+    pub device_type_id: Integer<u8, packed_bits::Bits7>,
+    #[packed_field(bits = "7")]
+    pub pairing_request: bool,
+}
+
+impl DeviceType {
+    pub fn new(device_type_id: Integer<u8, packed_bits::Bits7>, pairing_request: bool) -> Self {
+        Self {
+            device_type_id,
+            pairing_request,
+        }
+    }
+
+    pub fn wildcard(&mut self) {
+        self.pairing_request = false;
+        self.device_type_id = 0.into();
+    }
+
+    pub fn new_wildcard() -> Self {
+        Self {
+            pairing_request: false,
+            device_type_id: 0.into(),
         }
     }
 }
@@ -390,18 +249,16 @@ impl ChannelId {
             transmission_type,
         }
     }
-}
 
-impl Wildcard for ChannelId {
     /// Set all fields to their wildcard values
-    fn wildcard(&mut self) {
+    pub fn wildcard(&mut self) {
         self.device_number = 0;
         self.device_type.wildcard();
         self.transmission_type.wildcard();
     }
 
     /// Make a new ChannelId message with wildcard values
-    fn new_wildcard() -> Self {
+    pub fn new_wildcard() -> Self {
         Self {
             channel_number: 0,
             device_number: 0,
@@ -539,6 +396,13 @@ impl TransmitPower {
     }
 }
 
+#[derive(PrimitiveEnum_u16, Clone, Copy, PartialEq, Debug, Default)]
+pub enum SearchWaveformValue {
+    #[default]
+    Standard = 316,
+    Fast = 97,
+}
+
 /// Represents a Search Waveform message (0x49)
 #[derive(PackedStruct, AntTx, Clone, Copy, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
@@ -631,6 +495,13 @@ impl AddEncryptionIdToList {
     }
 }
 
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
+pub enum ListExclusion {
+    #[default]
+    Include = 0,
+    Exclude = 1,
+}
+
 /// Represents a Config ID List message (0x5A)
 #[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
@@ -655,6 +526,13 @@ impl ConfigIdList {
             exclude,
         }
     }
+}
+
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
+pub enum ListType {
+    #[default]
+    Whitelist = 0,
+    Blacklist = 1,
 }
 
 /// Represents a Config Encryption ID List message (0x5A)
@@ -913,6 +791,13 @@ impl ProximitySearch {
     }
 }
 
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
+pub enum EventBufferConfig {
+    #[default]
+    BufferLowPriorityEvents = 0,
+    BufferAllEvents = 1,
+}
+
 /// Represents a Configure Event Buffer message (0x74)
 #[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "6")]
@@ -1055,6 +940,34 @@ impl HighDutySearch {
     }
 }
 
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
+pub enum AdvancedBurstMaxPacketLength {
+    #[default]
+    Max8Byte = 0x01,
+    Max16Byte = 0x02,
+    Max24Byte = 0x03,
+}
+
+#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
+pub struct SupportedFeatures {
+    #[packed_field(bits = "0:6")]
+    _reserved: ReservedZeroes<packed_bits::Bits7>,
+    #[packed_field(bits = "7")]
+    pub adv_burst_frequency_hop_enabled: bool,
+    #[packed_field(bits = "8:23")]
+    _reserved1: ReservedZeroes<packed_bits::Bits16>,
+}
+
+impl SupportedFeatures {
+    pub fn new(adv_burst_frequency_hop_enabled: bool) -> Self {
+        Self {
+            adv_burst_frequency_hop_enabled,
+            ..Self::default()
+        }
+    }
+}
+
 /// Represents Configure Advanced Burst required fields
 #[derive(PackedStruct, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "9")]
@@ -1091,7 +1004,7 @@ pub struct ConfigureAdvancedBurst {
 
 const CONFIGURE_ADVANCED_BURST_DATA_SIZE: usize = 9;
 
-impl AntTxMessageType for ConfigureAdvancedBurst {
+impl TransmitableMessage for ConfigureAdvancedBurst {
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
         let mut len = CONFIGURE_ADVANCED_BURST_DATA_SIZE;
         self.data
@@ -1138,9 +1051,7 @@ impl ConfigureAdvancedBurst {
         }
     }
 
-    pub(crate) fn unpack_from_slice<R, W>(
-        buf: &[u8],
-    ) -> Result<ConfigureAdvancedBurst, DriverError<R, W>> {
+    pub(crate) fn unpack_from_slice(buf: &[u8]) -> Result<ConfigureAdvancedBurst, PackingError> {
         let data = ConfigureAdvancedBurstData::unpack_from_slice(
             &buf[..CONFIGURE_ADVANCED_BURST_DATA_SIZE],
         )?;
@@ -1157,11 +1068,18 @@ impl ConfigureAdvancedBurst {
         }
 
         if buf.len() < 2 {
-            return Err(DriverError::BadLength(buf.len(), 2));
+            return Err(PackingError::BufferSizeMismatch {
+                expected: 2,
+                actual: buf.len(),
+            });
         }
 
+        let stall_count_bytes = match buf[..2].try_into() {
+            Ok(x) => x,
+            Err(_) => return Err(PackingError::SliceIndexingError { slice_len: 2 }),
+        };
         msg.stall_count = Some(Integer::<u16, packed_bits::Bits16>::from_lsb_bytes(
-            buf[..2].try_into()?,
+            stall_count_bytes,
         )?);
         let buf = &buf[2..];
 
@@ -1170,11 +1088,18 @@ impl ConfigureAdvancedBurst {
         }
 
         if buf.len() != 1 {
-            return Err(DriverError::BadLength(buf.len(), 1));
+            return Err(PackingError::BufferSizeMismatch {
+                expected: 1,
+                actual: buf.len(),
+            });
         }
 
+        let retry_count_extension_bytes = match buf[..1].try_into() {
+            Ok(x) => x,
+            Err(_) => return Err(PackingError::SliceIndexingError { slice_len: 1 }),
+        };
         msg.retry_count_extension = Some(Integer::<u8, packed_bits::Bits8>::from_lsb_bytes(
-            buf[..1].try_into()?,
+            retry_count_extension_bytes,
         )?);
 
         Ok(msg)
@@ -1302,6 +1227,14 @@ impl SetSelectiveDataUpdateMask {
 }
 
 // TODO configure user nvme message
+
+#[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
+pub enum EncryptionMode {
+    #[default]
+    Disable = 0x00,
+    Enable = 0x01,
+    EnabledAndIncludeUserInformationString = 0x02,
+}
 
 /// Represents a Enable Single Channel Encryption message (0x7D)
 #[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
@@ -1481,670 +1414,34 @@ impl StoreEncryptionKeyInNvm {
 
 // TODO SetUsbDescriptorString
 
-#[derive(PackedStruct, Debug, Clone, PartialEq)]
-#[packed_struct(bit_numbering = "lsb0", endian = "lsb", size_bytes = "1")]
-pub struct StartUpMessage {
-    #[packed_field(bits = "0")]
-    pub hardware_reset_line: bool,
-    #[packed_field(bits = "1")]
-    pub watch_dog_reset: bool,
-    #[packed_field(bits = "5")]
-    pub command_reset: bool,
-    #[packed_field(bits = "6")]
-    pub synchronous_reset: bool,
-    #[packed_field(bits = "7")]
-    pub suspend_reset: bool,
-}
-
-impl StartUpMessage {
-    /// Helper function to detect special bitfield case of power on reset cause
-    // TODO test
-    pub fn is_power_on_reset(&self) -> bool {
-        !(self.hardware_reset_line
-            || self.watch_dog_reset
-            || self.command_reset
-            || self.synchronous_reset
-            || self.suspend_reset)
-    }
-}
-
-// TODO spec says rest of data contains a copy of the error message, need to validate how this
-// works on the usb in the field
-// Note this message has a range up to 255
-// TODO make a config so users can set TX and RX buffer sizes for embeded devices since only
-// users of the USB devices need the full 256 bytes for NVMe
-#[derive(PackedStruct, Debug, Clone, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
-pub struct SerialErrorMessage {
-    #[packed_field(bytes = "0", ty = "enum")]
-    pub error_number: SerialErrorType,
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
-pub struct ResetSystem {
-    #[packed_field(bytes = "0")]
-    filler: ReservedZeroes<packed_bits::Bits8>,
-}
-
-impl ResetSystem {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
-pub struct OpenChannel {
-    #[packed_field(bytes = "0")]
-    pub channel_number: u8,
-}
-
-impl OpenChannel {
-    pub fn new(channel_number: u8) -> Self {
-        Self { channel_number }
-    }
-}
-
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
-pub struct CloseChannel {
-    #[packed_field(bytes = "0")]
-    pub channel_number: u8,
-}
-
-impl CloseChannel {
-    pub fn new(channel_number: u8) -> Self {
-        Self { channel_number }
-    }
-}
-
-#[derive(PackedStruct, Clone, Copy, Debug, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
-pub struct RequestMessageData {
-    #[packed_field(bytes = "0")]
-    pub channel: u8,
-    #[packed_field(bytes = "1", ty = "enum")]
-    pub message_id: RequestableMessageId,
-}
-
-// TODO test
-#[derive(PackedStruct, Clone, Copy, Debug, Default, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
-pub struct NvmeRequest {
-    #[packed_field(bytes = "0:1")]
-    pub addr: u16,
-    #[packed_field(bytes = "2")]
-    pub size: u8,
-}
-
-impl NvmeRequest {
-    pub fn new(addr: u16, size: u8) -> Self {
-        Self { addr, size }
-    }
-}
-
-// TODO test
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct RequestMessage {
-    pub data: RequestMessageData,
-    pub nvme_region: Option<NvmeRequest>,
-}
-AntAutoPackWithExtention!(
-    RequestMessage,
-    TxMessageId::RequestMessage,
-    data,
-    nvme_region
-);
-
-impl RequestMessage {
-    pub fn new(
-        channel: u8,
-        message_id: RequestableMessageId,
-        nvme_region: Option<NvmeRequest>,
-    ) -> Self {
-        Self {
-            data: RequestMessageData {
-                channel,
-                message_id,
-            },
-            nvme_region,
-        }
-    }
-}
-
-// TODO implement serialize and test
-// TODO implement new handler
-pub struct OpenRxScanMode {
-    pub synchronous_channel_packets_only: Option<bool>,
-}
-
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
-pub struct SleepMessage {
-    #[packed_field(bytes = "0")]
-    filler: ReservedZeroes<packed_bits::Bits8>,
-}
-
-impl SleepMessage {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", size_bytes = "9")]
-pub struct BroadcastDataPayload {
-    #[packed_field(bytes = "0")]
-    pub channel_number: u8,
-    #[packed_field(bytes = "1:8")]
-    pub data: [u8; 8],
-}
-
-// TODO test TX
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct BroadcastData {
-    pub payload: BroadcastDataPayload,
-    pub extended_info: Option<ExtendedInfo>,
-}
-
-impl AntTxMessageType for BroadcastData {
-    fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
-        // Data payloads have optional RX fields but are ignored on TX
-        self.payload
-            .pack_to_slice(&mut buf[..BROADCAST_PAYLOAD_SIZE])?;
-        Ok(BROADCAST_PAYLOAD_SIZE)
-    }
-    fn get_tx_msg_id(&self) -> TxMessageId {
-        TxMessageId::BroadcastData
-    }
-}
-
-impl From<BroadcastData> for TxMessage {
-    fn from(msg: BroadcastData) -> TxMessage {
-        TxMessage::BroadcastData(msg)
-    }
-}
-
-const BROADCAST_PAYLOAD_SIZE: usize = 9;
-
-impl BroadcastData {
-    pub fn new(channel_number: u8, data: [u8; 8]) -> Self {
-        Self {
-            payload: BroadcastDataPayload {
-                channel_number,
-                data,
-            },
-            extended_info: None,
-        }
-    }
-
-    pub(crate) fn unpack_from_slice<R, W>(data: &[u8]) -> Result<BroadcastData, DriverError<R, W>> {
-        Ok(BroadcastData {
-            payload: BroadcastDataPayload::unpack_from_slice(&data[..BROADCAST_PAYLOAD_SIZE])?,
-            extended_info: ExtendedInfo::unpack_from_slice(&data[BROADCAST_PAYLOAD_SIZE..])?,
-        })
-    }
-}
-
-// Same byte payload, just different name
-pub type AcknowledgedDataPayload = BroadcastDataPayload;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct AcknowledgedData {
-    pub payload: AcknowledgedDataPayload,
-    pub extended_info: Option<ExtendedInfo>,
-}
-
-// TODO test TX
-impl AntTxMessageType for AcknowledgedData {
-    fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
-        // Data payloads have optional RX fields but are ignored on TX
-        self.payload
-            .pack_to_slice(&mut buf[..BROADCAST_PAYLOAD_SIZE])?;
-        Ok(BROADCAST_PAYLOAD_SIZE)
-    }
-    fn get_tx_msg_id(&self) -> TxMessageId {
-        TxMessageId::AcknowledgedData
-    }
-}
-
-impl From<AcknowledgedData> for TxMessage {
-    fn from(msg: AcknowledgedData) -> TxMessage {
-        TxMessage::AcknowledgedData(msg)
-    }
-}
-
-impl AcknowledgedData {
-    pub fn new(channel_number: u8, data: [u8; 8]) -> Self {
-        Self {
-            payload: BroadcastDataPayload {
-                channel_number,
-                data,
-            },
-            extended_info: None,
-        }
-    }
-
-    pub(crate) fn unpack_from_slice<R, W>(
-        data: &[u8],
-    ) -> Result<AcknowledgedData, DriverError<R, W>> {
-        Ok(AcknowledgedData {
-            payload: AcknowledgedDataPayload::unpack_from_slice(&data[..BROADCAST_PAYLOAD_SIZE])?,
-            extended_info: ExtendedInfo::unpack_from_slice(&data[BROADCAST_PAYLOAD_SIZE..])?,
-        })
-    }
-}
-
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", size_bytes = "9")]
-pub struct BurstTransferDataPayload {
-    #[packed_field(bytes = "0")]
-    pub channel_sequence: ChannelSequence,
-    #[packed_field(bytes = "1:8")]
-    pub data: [u8; 8],
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct BurstTransferData {
-    pub payload: BurstTransferDataPayload,
-    pub extended_info: Option<ExtendedInfo>,
-}
-
-// TODO test TX
-impl AntTxMessageType for BurstTransferData {
-    fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
-        // Data payloads have optional RX fields but are ignored on TX
-        self.payload
-            .pack_to_slice(&mut buf[..BURSTTRANSFER_PAYLOAD_SIZE])?;
-        Ok(BURSTTRANSFER_PAYLOAD_SIZE)
-    }
-    fn get_tx_msg_id(&self) -> TxMessageId {
-        TxMessageId::BurstTransferData
-    }
-}
-
-impl From<BurstTransferData> for TxMessage {
-    fn from(msg: BurstTransferData) -> TxMessage {
-        TxMessage::BurstTransferData(msg)
-    }
-}
-
-const BURSTTRANSFER_PAYLOAD_SIZE: usize = 9;
-
-impl BurstTransferData {
-    pub fn new(channel_sequence: ChannelSequence, data: [u8; 8]) -> Self {
-        Self {
-            payload: BurstTransferDataPayload {
-                channel_sequence,
-                data,
-            },
-            extended_info: None,
-        }
-    }
-
-    pub(crate) fn unpack_from_slice<R, W>(
-        data: &[u8],
-    ) -> Result<BurstTransferData, DriverError<R, W>> {
-        Ok(BurstTransferData {
-            payload: BurstTransferDataPayload::unpack_from_slice(
-                &data[..BURSTTRANSFER_PAYLOAD_SIZE],
-            )?,
-            extended_info: ExtendedInfo::unpack_from_slice(&data[BURSTTRANSFER_PAYLOAD_SIZE..])?,
-        })
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct AdvancedBurstData {
-    pub channel_sequence: ChannelSequence,
-    pub data: ArrayVec<u8, ADVANCED_BURST_BUFFER_SIZE>,
-}
-
-impl AdvancedBurstData {
-    pub fn new(
-        channel_sequence: ChannelSequence,
-        data: ArrayVec<u8, ADVANCED_BURST_BUFFER_SIZE>,
-    ) -> Self {
-        Self {
-            channel_sequence,
-            data,
-        }
-    }
-
-    pub(crate) fn unpack_from_slice<R, W>(data: &[u8]) -> Result<Self, DriverError<R, W>> {
-        Ok(AdvancedBurstData {
-            channel_sequence: ChannelSequence::unpack_from_slice(&data[..1])?,
-            data: data[1..].try_into()?,
-        })
-    }
-}
-
-impl AntTxMessageType for AdvancedBurstData {
-    // TODO test
-    fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
-        let sequence_size = ChannelSequence::packed_bytes_size(None)?;
-        let len = sequence_size + self.data.len();
-
-        self.channel_sequence
-            .pack_to_slice(&mut buf[..sequence_size])?;
-        buf[sequence_size..sequence_size + self.data.len()].copy_from_slice(&self.data);
-        Ok(len)
-    }
-    fn get_tx_msg_id(&self) -> TxMessageId {
-        TxMessageId::AdvancedBurstData
-    }
-}
-
-impl From<AdvancedBurstData> for TxMessage {
-    fn from(msg: AdvancedBurstData) -> TxMessage {
-        TxMessage::AdvancedBurstData(msg)
-    }
-}
-
-#[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", size_bytes = "3")]
-pub struct ChannelEventPayload {
-    #[packed_field(bytes = "0")]
-    pub channel_number: u8,
-    #[packed_field(bits = "8:14")]
-    _reserved0: ReservedZeroes<packed_bits::Bits7>,
-    #[packed_field(bits = "15")]
-    _reserved1: ReservedOnes<packed_bits::Bits1>,
-    #[packed_field(bytes = "2", ty = "enum")]
-    pub message_code: MessageCode,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct ChannelEvent {
-    pub payload: ChannelEventPayload,
-    pub extended_info: Option<ChannelEventExtension>,
-}
-// TODO test
-impl ChannelEvent {
-    pub(crate) fn unpack_from_slice<R, W>(data: &[u8]) -> Result<Self, DriverError<R, W>> {
-        let payload = ChannelEventPayload::unpack_from_slice(data)?;
-
-        Ok(ChannelEvent {
-            payload,
-            // TODO extended_info,
-            extended_info: None,
-        })
-    }
-}
-
-#[derive(PackedStruct, Debug, Clone, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
-pub struct ChannelResponse {
-    #[packed_field(bytes = "0")]
-    pub channel_number: u8,
-    #[packed_field(bytes = "1", ty = "enum")]
-    pub message_id: TxMessageId,
-    #[packed_field(bytes = "2", ty = "enum")]
-    pub message_code: MessageCode,
-}
-
-#[derive(PackedStruct, Debug, Clone, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
-pub struct ChannelStatus {
-    #[packed_field(bytes = "0")]
-    pub channel_number: u8,
-    #[packed_field(bits = "8:11", ty = "enum")]
-    pub channel_type: ChannelType,
-    #[packed_field(bits = "12:13")]
-    pub network_number: u8,
-    #[packed_field(bits = "14:15", ty = "enum")]
-    pub channel_state: ChannelState,
-}
-
-// TODO test
-#[derive(Clone, Debug, PartialEq)]
-pub struct AntVersion {
-    version: ArrayVec<u8, MAX_MESSAGE_DATA_SIZE>,
-}
-
-impl AntVersion {
-    pub(crate) fn unpack_from_slice<R, W>(data: &[u8]) -> Result<Self, DriverError<R, W>> {
-        Ok(Self {
-            version: data.try_into()?,
-        })
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Capabilities {
-    pub base_capabilities: BaseCapabilities,
-    pub advanced_options2: Option<AdvancedOptions2>,
-    pub max_sensrcore_channels: Option<u8>,
-    pub advanced_options3: Option<AdvancedOptions3>,
-    pub advanced_options4: Option<AdvancedOptions4>,
-}
-
-const BASECAPABILITIES_SIZE: usize = 4;
-const ADVANCEDOPTIONS2_SIZE: usize = 1;
-const MAX_SENSRCORE_CHANNELS_SIZE: usize = 1;
-const ADVANCEDOPTIONS3_SIZE: usize = 1;
-const ADVANCEDOPTIONS4_SIZE: usize = 1;
-
-// TODO test
-impl Capabilities {
-    pub(crate) fn unpack_from_slice<R, W>(data: &[u8]) -> Result<Self, DriverError<R, W>> {
-        let base_capabilities =
-            BaseCapabilities::unpack_from_slice(&data[..BASECAPABILITIES_SIZE])?;
-        let data = &data[BASECAPABILITIES_SIZE..];
-
-        if data.is_empty() {
-            return Ok(Capabilities {
-                base_capabilities,
-                advanced_options2: None,
-                max_sensrcore_channels: None,
-                advanced_options3: None,
-                advanced_options4: None,
-            });
-        }
-
-        let advanced_options2 =
-            AdvancedOptions2::unpack_from_slice(&data[..ADVANCEDOPTIONS2_SIZE])?;
-        let data = &data[ADVANCEDOPTIONS2_SIZE..];
-
-        if data.is_empty() {
-            return Ok(Capabilities {
-                base_capabilities,
-                advanced_options2: Some(advanced_options2),
-                max_sensrcore_channels: None,
-                advanced_options3: None,
-                advanced_options4: None,
-            });
-        }
-
-        let max_sensrcore_channels = data[0];
-        let data = &data[MAX_SENSRCORE_CHANNELS_SIZE..];
-
-        if data.is_empty() {
-            return Ok(Capabilities {
-                base_capabilities,
-                advanced_options2: Some(advanced_options2),
-                max_sensrcore_channels: Some(max_sensrcore_channels),
-                advanced_options3: None,
-                advanced_options4: None,
-            });
-        }
-
-        let advanced_options3 =
-            AdvancedOptions3::unpack_from_slice(&data[..ADVANCEDOPTIONS3_SIZE])?;
-        let data = &data[ADVANCEDOPTIONS3_SIZE..];
-
-        if data.is_empty() {
-            return Ok(Capabilities {
-                base_capabilities,
-                advanced_options2: Some(advanced_options2),
-                max_sensrcore_channels: Some(max_sensrcore_channels),
-                advanced_options3: Some(advanced_options3),
-                advanced_options4: None,
-            });
-        }
-
-        let advanced_options4 =
-            AdvancedOptions4::unpack_from_slice(&data[..ADVANCEDOPTIONS4_SIZE])?;
-        let data = &data[ADVANCEDOPTIONS4_SIZE..];
-
-        if data.is_empty() {
-            return Ok(Capabilities {
-                base_capabilities,
-                advanced_options2: Some(advanced_options2),
-                max_sensrcore_channels: Some(max_sensrcore_channels),
-                advanced_options3: Some(advanced_options3),
-                advanced_options4: Some(advanced_options4),
-            });
-        }
-
-        let expected_size = BASECAPABILITIES_SIZE
-            + ADVANCEDOPTIONS2_SIZE
-            + MAX_SENSRCORE_CHANNELS_SIZE
-            + ADVANCEDOPTIONS3_SIZE
-            + ADVANCEDOPTIONS4_SIZE;
-        Err(DriverError::BadLength(
-            expected_size + data.len(),
-            expected_size,
-        ))
-    }
-}
-
-// TODO test
-#[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
-#[packed_struct(bit_numbering = "lsb0", size_bytes = "5")]
-pub struct AdvancedBurstCapabilities {
-    #[packed_field(bytes = "0")]
-    _reserved: ReservedZeroes<packed_bits::Bits8>,
-    #[packed_field(bytes = "1", ty = "enum")]
-    pub supported_max_packed_length: AdvancedBurstMaxPacketLength,
-    #[packed_field(bytes = "2:4")]
-    pub supported_features: SupportedFeatures,
-}
-
-#[derive(PackedStruct, Debug, Clone, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "4")]
-pub struct SerialNumber {
-    #[packed_field(bytes = "0:3")]
-    serial_number: [u8; 4],
-}
-
-// Reexport under new name even though its the same type to match the docs
-// Reserved fields are ignored so any mismatch in fixed fields is ignored on parsing
-pub use ConfigureAdvancedBurst as AdvancedBurstCurrentConfiguration;
-pub use ConfigureEventBuffer as EventBufferConfiguration;
-pub use ConfigureEventFilter as EventFilter;
-pub use SetSelectiveDataUpdateMask as SelectiveDataUpdateMaskSetting;
-
-#[derive(PackedStruct, Clone, Copy, Debug, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
-pub struct UserNvmHeader {
-    #[packed_field(bytes = "0")]
-    resered: ReservedZeroes<packed_bits::Bits8>,
-}
-
-// TODO conditionally compile this, also magic num
-#[derive(Clone, Debug, PartialEq)]
-pub struct UserNvm {
-    header: UserNvmHeader,
-    data: ArrayVec<u8, 255>,
-}
-
-impl UserNvm {
-    pub(crate) fn unpack_from_slice<R, W>(data: &[u8]) -> Result<UserNvm, DriverError<R, W>> {
-        Ok(UserNvm {
-            header: UserNvmHeader::unpack_from_slice(&data[0..1])?,
-            data: data[1..].try_into()?,
-        })
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct EncryptionModeParameters {
-    pub requested_encryption_parameter: RequestedEncryptionParameter,
-    pub requested_encryption_parameter_data: RequestedEncryptionParameterData,
-}
-
-impl EncryptionModeParameters {
-    pub(crate) fn unpack_from_slice<R, W>(
-        data: &[u8],
-    ) -> Result<EncryptionModeParameters, DriverError<R, W>> {
-        if data.is_empty() {
-            return Err(DriverError::BadLength(0, 1));
-        }
-        let parameter = RequestedEncryptionParameter::from_primitive(data[0])
-            .ok_or(DriverError::InvalidData())?;
-        // TODO magic num
-        let data = &data[1..];
-        let data = match parameter {
-            RequestedEncryptionParameter::MaxSupportedEncryptionMode => {
-                if data.len() != 1 {
-                    return Err(DriverError::BadLength(data.len(), 1));
-                }
-                let param = match EncryptionMode::from_primitive(data[0]) {
-                    Some(x) => x,
-                    None => return Err(DriverError::InvalidData()),
-                };
-                RequestedEncryptionParameterData::MaxSupportedEncryptionMode(param)
-            }
-            RequestedEncryptionParameter::EncryptionId => {
-                RequestedEncryptionParameterData::EncryptionId(EncryptionId::try_from(data)?)
-            }
-            RequestedEncryptionParameter::UserInformationString => {
-                RequestedEncryptionParameterData::UserInformationString(
-                    UserInformationString::try_from(data)?,
-                )
-            }
-        };
-        Ok(EncryptionModeParameters {
-            requested_encryption_parameter: parameter,
-            requested_encryption_parameter_data: data,
-        })
-    }
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
-pub struct CwInit {
-    #[packed_field(bytes = "0")]
-    filler: ReservedZeroes<packed_bits::Bits8>,
-}
-
-impl CwInit {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
-#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
-pub struct CwTest {
-    #[packed_field(bytes = "0")]
-    filler: ReservedZeroes<packed_bits::Bits8>,
-    #[packed_field(bytes = "1")]
-    pub transmit_power: u8,
-    #[packed_field(bytes = "2")]
-    pub channel_rf_frequency: u8,
-}
-
-impl CwTest {
-    pub fn new(transmit_power: u8, channel_rf_frequency: u8) -> Self {
-        Self {
-            transmit_power,
-            channel_rf_frequency,
-            ..Self::default()
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use inner::inner;
-    use packed_struct::PackingError;
 
-    #[derive(Debug)]
-    enum SerialError {}
+    #[test]
+    fn transmission_type() {
+        let unpacked = TransmissionType::unpack(&[0b11110110]).unwrap();
+        assert_eq!(
+            unpacked.transmission_channel_type,
+            TransmissionChannelType::SharedChannel1ByteAddress
+        );
+        assert_eq!(
+            unpacked.global_datapages_used,
+            TransmissionGlobalDataPages::GlobalDataPagesUsed
+        );
+        assert_eq!(*unpacked.device_number_extension, 0b1111);
+
+        let mut packed = TransmissionType::new(
+            TransmissionChannelType::IndependentChannel,
+            TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+            0b1001.into(),
+        );
+
+        assert_eq!(packed.pack().unwrap(), [0b1001_0001]);
+
+        packed.wildcard();
+        assert_eq!(packed.pack().unwrap(), [0x0]);
+    }
 
     #[test]
     fn unassign_channel() {
@@ -2364,6 +1661,7 @@ mod tests {
 
     #[test]
     fn configure_advanced_burst() {
+        use crate::messages::MAX_MESSAGE_DATA_SIZE;
         let mut buf: [u8; MAX_MESSAGE_DATA_SIZE] = [0; MAX_MESSAGE_DATA_SIZE];
         let packed = ConfigureAdvancedBurst::new(
             true,
@@ -2376,33 +1674,7 @@ mod tests {
         let size = packed.serialize_message(&mut buf[..]).unwrap();
         assert_eq!(buf[..size], [0, 1, 0x03, 0, 0, 0, 1, 0, 0]);
         // TODO test optional fields
-        // test RX
-        let unpacked = AdvancedBurstCurrentConfiguration::unpack_from_slice::<
-            SerialError,
-            SerialError,
-        >(&[1, 1, 2, 1, 0, 0, 0, 0, 0])
-        .unwrap();
-
-        assert_eq!(unpacked.data.enable, true);
-        assert_eq!(
-            unpacked.data.max_packet_length,
-            AdvancedBurstMaxPacketLength::Max16Byte
-        );
-        assert_eq!(
-            unpacked
-                .data
-                .required_features
-                .adv_burst_frequency_hop_enabled,
-            true
-        );
-        assert_eq!(
-            unpacked
-                .data
-                .optional_features
-                .adv_burst_frequency_hop_enabled,
-            false
-        );
-        // TODO optional fields
+        // TODO test RX
     }
 
     #[test]
@@ -2484,245 +1756,5 @@ mod tests {
             packed.pack().unwrap(),
             [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
         );
-    }
-
-    #[test]
-    fn startup_message() {
-        let unpacked = StartUpMessage::unpack(&[0x02]).unwrap();
-        assert_eq!(unpacked.watch_dog_reset, true);
-    }
-
-    #[test]
-    fn serial_error_message() {
-        let unpacked = SerialErrorMessage::unpack(&[0x02]).unwrap();
-        assert_eq!(
-            unpacked.error_number,
-            SerialErrorType::IncorrectChecksumByte
-        );
-    }
-
-    #[test]
-    fn reset_system() {
-        let packed = ResetSystem::new();
-        assert_eq!(packed.pack().unwrap(), [0]);
-    }
-
-    #[test]
-    fn open_channel() {
-        let packed = OpenChannel::new(0);
-        assert_eq!(packed.pack().unwrap(), [0]);
-    }
-
-    #[test]
-    fn close_channel() {
-        let packed = CloseChannel::new(0);
-        assert_eq!(packed.pack().unwrap(), [0]);
-    }
-
-    #[test]
-    fn sleep_message() {
-        let packed = SleepMessage::new();
-        assert_eq!(packed.pack().unwrap(), [0]);
-    }
-
-    #[test]
-    fn broadcast_data() {
-        let packed = BroadcastData::unpack_from_slice::<SerialError, SerialError>(&[
-            0, 1, 2, 3, 4, 5, 6, 7, 8,
-        ])
-        .unwrap();
-        assert_eq!(packed.payload.channel_number, 0);
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(packed.extended_info, None);
-        let packed = BroadcastData::unpack_from_slice::<SerialError, SerialError>(&[
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 0x20, 0xBB, 0xAA,
-        ])
-        .unwrap();
-        assert_eq!(packed.payload.channel_number, 0);
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        let ext_info = packed.extended_info.unwrap();
-        assert_eq!(ext_info.flag_byte.channel_id_output, false);
-        assert_eq!(ext_info.flag_byte.rssi_output, false);
-        assert_eq!(ext_info.flag_byte.timestamp_output, true);
-        assert_eq!(ext_info.timestamp_output.unwrap().rx_timestamp, 0xAABB);
-
-        // TODO TX
-    }
-
-    #[test]
-    fn acknowledged_data() {
-        let packed = AcknowledgedData::unpack_from_slice::<SerialError, SerialError>(&[
-            0, 1, 2, 3, 4, 5, 6, 7, 8,
-        ])
-        .unwrap();
-        assert_eq!(packed.payload.channel_number, 0);
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(packed.extended_info, None);
-        let packed = AcknowledgedData::unpack_from_slice::<SerialError, SerialError>(&[
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 0x20, 0xBB, 0xAA,
-        ])
-        .unwrap();
-        assert_eq!(packed.payload.channel_number, 0);
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        let ext_info = packed.extended_info.unwrap();
-        assert_eq!(ext_info.flag_byte.channel_id_output, false);
-        assert_eq!(ext_info.flag_byte.rssi_output, false);
-        assert_eq!(ext_info.flag_byte.timestamp_output, true);
-        assert_eq!(ext_info.timestamp_output.unwrap().rx_timestamp, 0xAABB);
-
-        // TODO TX
-    }
-
-    #[test]
-    fn burst_transfer_data() {
-        let packed = BurstTransferData::unpack_from_slice::<SerialError, SerialError>(&[
-            0x21, 1, 2, 3, 4, 5, 6, 7, 8,
-        ])
-        .unwrap();
-        assert_eq!(packed.payload.channel_sequence.channel_number, 1.into());
-        assert_eq!(packed.payload.channel_sequence.sequence_number, 1.into());
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(packed.extended_info, None);
-        let packed = BurstTransferData::unpack_from_slice::<SerialError, SerialError>(&[
-            0x20, 1, 2, 3, 4, 5, 6, 7, 8, 0x20, 0xBB, 0xAA,
-        ])
-        .unwrap();
-        assert_eq!(packed.payload.channel_sequence.channel_number, 0.into());
-        assert_eq!(packed.payload.channel_sequence.sequence_number, 1.into());
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        let ext_info = packed.extended_info.unwrap();
-        assert_eq!(ext_info.flag_byte.channel_id_output, false);
-        assert_eq!(ext_info.flag_byte.rssi_output, false);
-        assert_eq!(ext_info.flag_byte.timestamp_output, true);
-        assert_eq!(ext_info.timestamp_output.unwrap().rx_timestamp, 0xAABB);
-
-        // TODO TX
-    }
-
-    #[test]
-    fn channel_response() -> Result<(), PackingError> {
-        let unpacked = ChannelResponse::unpack(&[1, 0x6E, 0x00])?;
-        assert_eq!(unpacked.channel_number, 1);
-        assert_eq!(unpacked.message_id, TxMessageId::LibConfig);
-        assert_eq!(unpacked.message_code, MessageCode::ResponseNoError);
-        Ok(())
-    }
-
-    #[test]
-    fn channel_status() {
-        let unpacked = ChannelStatus::unpack(&[1, 0x36]).unwrap();
-        assert_eq!(unpacked.channel_number, 1);
-        assert_eq!(
-            unpacked.channel_type,
-            ChannelType::SharedBidirectionalMaster
-        );
-        assert_eq!(unpacked.network_number, 1);
-        assert_eq!(unpacked.channel_state, ChannelState::Searching);
-    }
-
-    #[test]
-    fn serial_number() {
-        let unpacked = SerialNumber::unpack(&[0xAA, 0xBB, 0xCC, 0xDD]).unwrap();
-        assert_eq!(unpacked.serial_number, [0xAA, 0xBB, 0xCC, 0xDD]);
-    }
-
-    #[test]
-    fn event_buffer_configuration() {
-        let unpacked = EventBufferConfiguration::unpack(&[0, 1, 0xAA, 0xBB, 0xCC, 0xDD]).unwrap();
-        assert_eq!(unpacked.config, EventBufferConfig::BufferAllEvents);
-        assert_eq!(unpacked.size, 0xBBAA);
-        assert_eq!(unpacked.time, 0xDDCC);
-    }
-
-    #[test]
-    fn encryption_mode_parameters() {
-        let unpacked =
-            EncryptionModeParameters::unpack_from_slice::<SerialError, SerialError>(&[0, 1])
-                .unwrap();
-        assert_eq!(
-            unpacked.requested_encryption_parameter,
-            RequestedEncryptionParameter::MaxSupportedEncryptionMode
-        );
-        let mode = inner!(unpacked.requested_encryption_parameter_data,
-            if RequestedEncryptionParameterData::MaxSupportedEncryptionMode);
-        assert_eq!(mode, EncryptionMode::Enable);
-        let unpacked = EncryptionModeParameters::unpack_from_slice::<SerialError, SerialError>(&[
-            1, 0xAA, 0xBB, 0xCC, 0xDD,
-        ])
-        .unwrap();
-        assert_eq!(
-            unpacked.requested_encryption_parameter,
-            RequestedEncryptionParameter::EncryptionId
-        );
-        let id = inner!(unpacked.requested_encryption_parameter_data,
-            if RequestedEncryptionParameterData::EncryptionId);
-        assert_eq!(id, [0xAA, 0xBB, 0xCC, 0xDD]);
-        let data = [
-            2, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
-            0xFF, 0x01, 0x02, 0x03, 0x04,
-        ];
-        let unpacked =
-            EncryptionModeParameters::unpack_from_slice::<SerialError, SerialError>(&data).unwrap();
-        assert_eq!(
-            unpacked.requested_encryption_parameter,
-            RequestedEncryptionParameter::UserInformationString
-        );
-        let id = inner!(unpacked.requested_encryption_parameter_data,
-            if RequestedEncryptionParameterData::UserInformationString);
-        assert_eq!(id, &data[1..]);
-    }
-
-    #[test]
-    fn user_nvm() {
-        let unpacked =
-            UserNvm::unpack_from_slice::<SerialError, SerialError>(&[0, 1, 2, 3, 4]).unwrap();
-        assert_eq!(unpacked.data.len(), 4);
-        assert_eq!(unpacked.data.as_slice(), &[1, 2, 3, 4]);
-        let unpacked =
-            UserNvm::unpack_from_slice::<SerialError, SerialError>(&[0, 1, 2, 3, 4, 5, 6]).unwrap();
-        assert_eq!(unpacked.data.len(), 6);
-        assert_eq!(unpacked.data.as_slice(), &[1, 2, 3, 4, 5, 6]);
-    }
-
-    #[test]
-    fn ant_version() -> Result<(), DriverError<SerialError, SerialError>> {
-        let input = [0x64, 0x65, 0x61, 0x64, 0x62, 0x65, 0x65, 0x66];
-        let unpacked = AntVersion::unpack_from_slice::<SerialError, SerialError>(&input)?;
-        assert_eq!(unpacked.version.as_slice(), input);
-        Ok(())
-    }
-
-    #[test]
-    fn cw_init() -> Result<(), PackingError> {
-        let packed = CwInit::new();
-        assert_eq!(packed.pack()?, [0]);
-        Ok(())
-    }
-
-    #[test]
-    fn cw_test() {
-        let packed = CwTest::new(1, 2);
-        assert_eq!(packed.pack().unwrap(), [0, 1, 2]);
-    }
-
-    #[test]
-    fn advanced_burst_data() {
-        let unpacked = AdvancedBurstData::unpack_from_slice::<SerialError, SerialError>(&[
-            10, 1, 2, 3, 4, 5, 6, 7, 8,
-        ])
-        .unwrap();
-        let mut buf = ArrayVec::<u8, ADVANCED_BURST_BUFFER_SIZE>::new();
-        [1, 2, 3, 4, 5, 6, 7, 8].iter().for_each(|x| buf.push(*x));
-        assert_eq!(
-            unpacked,
-            AdvancedBurstData {
-                channel_sequence: ChannelSequence {
-                    channel_number: 10.into(),
-                    sequence_number: 0.into(),
-                },
-                data: buf,
-            }
-        );
-        // TODO TX
     }
 }

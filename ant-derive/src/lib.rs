@@ -21,7 +21,7 @@ pub fn derive_ant_tx(input: TokenStream) -> TokenStream {
 fn impl_ant_tx(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let gen = quote! {
-        impl AntTxMessageType for #name {
+        impl TransmitableMessage for #name {
             fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
                 let len = PackedStructSlice::packed_bytes_size(Some(self))?;
                 self.pack_to_slice(&mut buf[..len])?;

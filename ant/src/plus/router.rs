@@ -7,7 +7,10 @@
 // except according to those terms.
 
 use crate::drivers::*;
-use crate::messages::*;
+use crate::messages::config::{SetNetworkKey, UnAssignChannel, NETWORK_KEY_SIZE};
+use crate::messages::control::{CloseChannel, RequestMessage, RequestableMessageId, ResetSystem};
+use crate::messages::requested_response::Capabilities;
+use crate::messages::{AntMessage, RxMessage, TransmitableMessage};
 use crate::plus::{Channel, ChannelAssignment};
 
 use std::cell::{Cell, RefCell};
@@ -221,7 +224,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     }
 
     /// Transmit a message to the radio
-    pub fn send(&self, msg: &dyn AntTxMessageType) -> Result<(), RouterError> {
+    pub fn send(&self, msg: &dyn TransmitableMessage) -> Result<(), RouterError> {
         self.driver.borrow_mut().send_message(msg)?;
         Ok(())
     }
@@ -294,56 +297,52 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
         }
         match &msg.message {
             // These messages all have channel information, forward it accordingly
-            RxMessageType::BroadcastData(data) => {
+            RxMessage::BroadcastData(data) => self.route_message(data.payload.channel_number, msg),
+            RxMessage::AcknowledgedData(data) => {
                 self.route_message(data.payload.channel_number, msg)
             }
-            RxMessageType::AcknowledgedData(data) => {
-                self.route_message(data.payload.channel_number, msg)
-            }
-            RxMessageType::BurstTransferData(data) => {
+            RxMessage::BurstTransferData(data) => {
                 self.route_message(data.payload.channel_sequence.channel_number.into(), msg)
             }
-            RxMessageType::AdvancedBurstData(data) => {
+            RxMessage::AdvancedBurstData(data) => {
                 self.route_message(data.channel_sequence.channel_number.into(), msg)
             }
-            RxMessageType::ChannelEvent(data) => {
-                self.route_message(data.payload.channel_number, msg)
-            }
-            RxMessageType::ChannelResponse(data) => self.route_message(data.channel_number, msg),
-            RxMessageType::ChannelStatus(data) => self.route_message(data.channel_number, msg),
-            RxMessageType::ChannelId(data) => self.route_message(data.channel_number, msg),
+            RxMessage::ChannelEvent(data) => self.route_message(data.payload.channel_number, msg),
+            RxMessage::ChannelResponse(data) => self.route_message(data.channel_number, msg),
+            RxMessage::ChannelStatus(data) => self.route_message(data.channel_number, msg),
+            RxMessage::ChannelId(data) => self.route_message(data.channel_number, msg),
             // These messages can all provide actionable information to the profile but are not
             // channel specific
-            RxMessageType::StartUpMessage(_) => {
+            RxMessage::StartUpMessage(_) => {
                 self.broadcast_message(msg);
                 Ok(())
             }
-            RxMessageType::Capabilities(data) => {
+            RxMessage::Capabilities(data) => {
                 self.broadcast_message(msg);
                 self.parse_capabilities(data);
                 Ok(())
             }
-            RxMessageType::AdvancedBurstCapabilities(_) => {
+            RxMessage::AdvancedBurstCapabilities(_) => {
                 self.broadcast_message(msg);
                 Ok(())
             }
-            RxMessageType::AdvancedBurstConfiguration(_) => {
+            RxMessage::AdvancedBurstCurrentConfiguration(_) => {
                 self.broadcast_message(msg);
                 Ok(())
             }
-            RxMessageType::EncryptionModeParameters(_) => {
+            RxMessage::EncryptionModeParameters(_) => {
                 self.broadcast_message(msg);
                 Ok(())
             }
             // These message are not channel specific and operate at the router scope, should be
             // consumed directly at router callback
-            RxMessageType::EventFilter(_) => Ok(()),
-            RxMessageType::SerialErrorMessage(_) => Ok(()),
-            RxMessageType::AntVersion(_) => Ok(()),
-            RxMessageType::SerialNumber(_) => Ok(()),
-            RxMessageType::EventBufferConfiguration(_) => Ok(()),
-            RxMessageType::SelectiveDataUpdateMaskSetting(_) => Ok(()),
-            RxMessageType::UserNvm(_) => Ok(()),
+            RxMessage::EventFilter(_) => Ok(()),
+            RxMessage::SerialErrorMessage(_) => Ok(()),
+            RxMessage::AntVersion(_) => Ok(()),
+            RxMessage::SerialNumber(_) => Ok(()),
+            RxMessage::EventBufferConfiguration(_) => Ok(()),
+            RxMessage::SelectiveDataUpdateMaskSetting(_) => Ok(()),
+            RxMessage::UserNvm(_) => Ok(()),
         }?;
         Ok(())
     }

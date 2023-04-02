@@ -47,6 +47,5 @@ extern crate alloc;
 extern crate core as std;
 
 pub mod drivers;
-pub mod fields;
 pub mod messages;
 pub mod plus;

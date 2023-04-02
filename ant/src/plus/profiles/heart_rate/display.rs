@@ -6,8 +6,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::fields::{TransmissionChannelType, TransmissionGlobalDataPages};
-use crate::messages::{AcknowledgedData, AntMessage, BroadcastData, RxMessageType, TxMessage};
+use crate::messages::config::{TransmissionChannelType, TransmissionGlobalDataPages};
+use crate::messages::data::{AcknowledgedData, BroadcastData};
+use crate::messages::{AntMessage, RxMessage, TxMessage};
 use crate::plus::common::datapages::{ModeSettings, RequestDataPage, MANUFACTURER_SPECIFIC_RANGE};
 use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
 use crate::plus::profiles::heart_rate::{
@@ -183,8 +184,8 @@ impl Channel for HeartRateDisplay {
             f(msg);
         }
         match msg.message {
-            RxMessageType::BroadcastData(msg) => self.handle_dp(&msg.payload.data),
-            RxMessageType::AcknowledgedData(msg) => self.handle_dp(&msg.payload.data),
+            RxMessage::BroadcastData(msg) => self.handle_dp(&msg.payload.data),
+            RxMessage::AcknowledgedData(msg) => self.handle_dp(&msg.payload.data),
             _ => (),
         }
         self.msg_handler.receive_message(msg);

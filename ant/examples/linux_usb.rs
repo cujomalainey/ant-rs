@@ -7,7 +7,11 @@
 // except according to those terms.
 
 use ant::drivers::*;
-use ant::messages::*;
+use ant::messages::config::{
+    AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
+    LibConfig, SetNetworkKey, TransmissionType,
+};
+use ant::messages::control::{OpenChannel, ResetSystem};
 
 use linux_embedded_hal::Serial;
 

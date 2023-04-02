@@ -6,15 +6,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::fields::{
-    ChannelType, DeviceType, MessageCode, TransmissionChannelType, TransmissionGlobalDataPages,
-    TransmissionType, Wildcard,
+use crate::messages::channel::{ChannelEvent, ChannelResponse, MessageCode};
+use crate::messages::config::{
+    AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
+    SearchTimeout, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
 };
-use crate::messages::{
-    AntMessage, AssignChannel, ChannelEvent, ChannelId, ChannelPeriod, ChannelResponse,
-    ChannelRfFrequency, ChannelStatus, CloseChannel, OpenChannel, RxMessageType, SearchTimeout,
-    TxMessage,
-};
+use crate::messages::control::{CloseChannel, OpenChannel};
+use crate::messages::requested_response::ChannelStatus;
+use crate::messages::{AntMessage, RxMessage, TxMessage};
 use crate::plus::ChannelAssignment;
 use packed_struct::prelude::{packed_bits, Integer};
 
@@ -169,10 +168,10 @@ impl MessageHandler {
 
     pub fn receive_message(&mut self, msg: &AntMessage) {
         match &msg.message {
-            RxMessageType::ChannelResponse(msg) => self.handle_response(msg),
-            RxMessageType::ChannelEvent(msg) => self.handle_event(msg),
-            RxMessageType::ChannelId(msg) => self.handle_id(msg),
-            RxMessageType::ChannelStatus(msg) => self.handle_status(msg),
+            RxMessage::ChannelResponse(msg) => self.handle_response(msg),
+            RxMessage::ChannelEvent(msg) => self.handle_event(msg),
+            RxMessage::ChannelId(msg) => self.handle_id(msg),
+            RxMessage::ChannelStatus(msg) => self.handle_status(msg),
             _ => (),
         }
     }
