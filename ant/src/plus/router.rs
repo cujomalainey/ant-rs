@@ -7,7 +7,7 @@
 // except according to those terms.
 
 use crate::drivers::*;
-use crate::messages::config::{SetNetworkKey, UnAssignChannel, NETWORK_KEY_SIZE};
+use crate::messages::config::UnAssignChannel;
 use crate::messages::control::{CloseChannel, RequestMessage, RequestableMessageId, ResetSystem};
 use crate::messages::requested_response::Capabilities;
 use crate::messages::{AntMessage, RxMessage, TransmitableMessage};
@@ -45,20 +45,9 @@ pub enum ChannelError {
     NetworkKeyNotSet(),
 }
 
-/// Used with [set_key](Router::set_key) to identify what key is being set
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum NetworkKey {
-    AntPlusKey,
-    AntFsKey,
-    Public,
-    Custom(u8),
-}
-
 // This in theory is infinite, but its what the current hardware limit is.
 /// Highest known supported channel count on a ANT device
 pub const MAX_CHANNELS: usize = 15;
-/// Highest known supported network count on a ANT device
-pub const MAX_NETWORKS: usize = 8;
 
 type SharedChannel = Rc<RefCell<dyn Channel>>;
 
@@ -67,8 +56,6 @@ pub struct Router<R, W, D: Driver<R, W>> {
     max_channels: Cell<usize>, // what the hardware reports as some have less than max
     // TODO remove this refcell
     driver: RefCell<D>,
-    network_key_indexes: [Option<NetworkKey>; MAX_NETWORKS],
-    max_networks: Cell<usize>,
     reset_restore: Cell<bool>,
     rx_message_callback: Option<fn(&AntMessage)>,
     _read_marker: PhantomData<R>,
@@ -107,9 +94,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
                 None, None, None, None, None, None, None, None, None, None, None, None, None, None,
                 None,
             ],
-            network_key_indexes: [None; MAX_NETWORKS],
             max_channels: Cell::new(0),
-            max_networks: Cell::new(0),
             reset_restore: Cell::new(false),
             driver: RefCell::new(driver),
             rx_message_callback: None,
@@ -118,7 +103,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
         };
         // If we don't get a response within 25ms give up
         let mut i = 0;
-        while router.max_networks.get() == 0 && i < ROUTER_CAPABILITIES_RETRIES {
+        while router.max_channels.get() == 0 && i < ROUTER_CAPABILITIES_RETRIES {
             router.process()?;
             i += 1;
         }
@@ -126,53 +111,6 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
             return Err(RouterError::FailedToGetCapabilities());
         }
         Ok(router)
-    }
-
-    /// Set keys in a way the router can track. This allows profiles to lookup which network they
-    /// should use
-    pub fn set_key(
-        &mut self,
-        key: NetworkKey,
-        network_key: &[u8; NETWORK_KEY_SIZE],
-    ) -> Result<(), RouterError> {
-        let index = self.network_key_indexes.iter().position(|x| x.is_none());
-        if let Some(index) = index {
-            return self.set_key_at_index(key, network_key, index);
-        }
-        Err(RouterError::OutOfNetworks())
-    }
-
-    pub fn set_key_at_index(
-        &mut self,
-        key: NetworkKey,
-        network_key: &[u8; NETWORK_KEY_SIZE],
-        index: usize,
-    ) -> Result<(), RouterError> {
-        let max_net = self.max_networks.get();
-        if max_net == 0 {
-            return Err(RouterError::DeviceCapabilitiesUnknown());
-        }
-        if index >= max_net {
-            return Err(RouterError::OutOfNetworks());
-        }
-        if self.network_key_indexes[index].is_some() {
-            return Err(RouterError::NetworkIndexInUse());
-        }
-        self.driver.borrow_mut().send_message(&SetNetworkKey {
-            network_number: index as u8,
-            network_key: *network_key,
-        })?;
-        self.network_key_indexes[index] = Some(key);
-        Ok(())
-    }
-
-    /// Lookup key by [NetworkKey]
-    pub fn get_key_index(&self, key: NetworkKey) -> Option<u8> {
-        self.network_key_indexes
-            .iter()
-            .flatten()
-            .position(|x| *x == key)
-            .map(|x| x as u8)
     }
 
     /// Add a channel at next available index
@@ -287,8 +225,6 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     fn parse_capabilities(&self, msg: &Capabilities) {
         self.max_channels
             .set(msg.base_capabilities.max_ant_channels as usize);
-        self.max_networks
-            .set(msg.base_capabilities.max_networks as usize);
     }
 
     fn handle_message(&self, msg: &AntMessage) -> Result<(), RouterError> {
