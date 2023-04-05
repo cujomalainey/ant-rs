@@ -8,6 +8,7 @@
 
 use crate::plus::common::datapages::BatteryStatusField;
 use ant_derive::DataPage;
+use derive_new::new;
 use packed_struct::prelude::*;
 
 // TODO TEST THIS FILE
@@ -40,7 +41,7 @@ impl From<DataPageNumbers> for Integer<u8, packed_bits::Bits7> {
 
 /// The last 4 bytes in every message in the heart rate profile are the same, this maps out those
 /// fields
-#[derive(PackedStruct, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "4")]
 pub struct CommonData {
     #[packed_field(bytes = "0:1")]
@@ -51,45 +52,27 @@ pub struct CommonData {
     pub computed_heart_rate: u8,
 }
 
-impl CommonData {
-    pub fn new(heart_beat_event_time: u16, heart_beat_count: u8, computed_heart_rate: u8) -> Self {
-        Self {
-            heart_beat_event_time,
-            heart_beat_count,
-            computed_heart_rate,
-        }
-    }
-}
-
 /// This struct represents datapage 0 in the heart rate profile.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct DefaultDataPage {
+    #[new(value = "DataPageNumbers::DefaultDataPage.into()")]
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
+    #[new(default)]
     #[packed_field(bytes = "1:3")]
     _reserved: ReservedOnes<packed_bits::Bits24>,
     #[packed_field(bytes = "4:7")]
     pub common: CommonData,
 }
 
-impl DefaultDataPage {
-    pub fn new(page_change_toggle: bool, common: CommonData) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::DefaultDataPage.into(),
-            page_change_toggle,
-            common,
-            _reserved: Default::default(),
-        }
-    }
-}
-
 /// This struct represents datapage 1 in the heart rate profile.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct CumulativeOperatingTime {
+    #[new(value = "DataPageNumbers::CumulativeOperatingTime.into()")]
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
@@ -100,25 +83,11 @@ pub struct CumulativeOperatingTime {
     pub common: CommonData,
 }
 
-impl CumulativeOperatingTime {
-    pub fn new(
-        page_change_toggle: bool,
-        cumulative_operating_time: Integer<u32, packed_bits::Bits24>,
-        common: CommonData,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::CumulativeOperatingTime.into(),
-            page_change_toggle,
-            cumulative_operating_time,
-            common,
-        }
-    }
-}
-
 /// This struct represents datapage 2 in the heart rate profile.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct ManufacturerInformation {
+    #[new(value = "DataPageNumbers::ManufacturerInformation.into()")]
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
@@ -131,27 +100,11 @@ pub struct ManufacturerInformation {
     pub common: CommonData,
 }
 
-impl ManufacturerInformation {
-    pub fn new(
-        page_change_toggle: bool,
-        manufacturer_id: u8,
-        serial_number: u16,
-        common: CommonData,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::ManufacturerInformation.into(),
-            page_change_toggle,
-            manufacturer_id,
-            serial_number,
-            common,
-        }
-    }
-}
-
 /// This struct represents datapage 3 in the heart rate profile.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct ProductInformation {
+    #[new(value = "DataPageNumbers::ProductInformation.into()")]
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
@@ -166,29 +119,11 @@ pub struct ProductInformation {
     pub common: CommonData,
 }
 
-impl ProductInformation {
-    pub fn new(
-        page_change_toggle: bool,
-        hardware_version: u8,
-        software_version: u8,
-        model_number: u8,
-        common: CommonData,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::ProductInformation.into(),
-            page_change_toggle,
-            hardware_version,
-            software_version,
-            model_number,
-            common,
-        }
-    }
-}
-
 /// This struct represents datapage 4 in the heart rate profile.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct PreviousHeartBeat {
+    #[new(value = "DataPageNumbers::PreviousHeartBeat.into()")]
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
@@ -201,28 +136,12 @@ pub struct PreviousHeartBeat {
     pub common: CommonData,
 }
 
-impl PreviousHeartBeat {
-    pub fn new(
-        page_change_toggle: bool,
-        manufacturer_specific: u8,
-        previous_heart_beat_event_time: u16,
-        common: CommonData,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::PreviousHeartBeat.into(),
-            page_change_toggle,
-            manufacturer_specific,
-            previous_heart_beat_event_time,
-            common,
-        }
-    }
-}
-
 /// This struct represents datapage 5 in the heart rate profile.
 /// Monitors don't need to implement this unless they support the Swimming feature.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct SwimIntervalSummary {
+    #[new(value = "DataPageNumbers::SwimIntervalSummary.into()")]
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
@@ -237,26 +156,7 @@ pub struct SwimIntervalSummary {
     pub common: CommonData,
 }
 
-impl SwimIntervalSummary {
-    pub fn new(
-        page_change_toggle: bool,
-        interval_average_heart_rate: u8,
-        interval_maximum_heart_rate: u8,
-        session_average_heart_rate: u8,
-        common: CommonData,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::SwimIntervalSummary.into(),
-            page_change_toggle,
-            interval_average_heart_rate,
-            interval_maximum_heart_rate,
-            session_average_heart_rate,
-            common,
-        }
-    }
-}
-
-#[derive(PackedStruct, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct Features {
     #[packed_field(bits = "0")]
@@ -267,6 +167,7 @@ pub struct Features {
     pub extended_swimming_features: bool,
     #[packed_field(bits = "3")]
     pub gym_mode: bool,
+    #[new(default)]
     #[packed_field(bits = "4:5")]
     _reserved: ReservedZeroes<packed_bits::Bits3>,
     #[packed_field(bits = "6")]
@@ -275,35 +176,16 @@ pub struct Features {
     pub manufacturer_specific_feature_1: bool,
 }
 
-impl Features {
-    pub fn new(
-        extended_running_features: bool,
-        extended_cycling_features: bool,
-        extended_swimming_features: bool,
-        gym_mode: bool,
-        manufacturer_specific_feature_0: bool,
-        manufacturer_specific_feature_1: bool,
-    ) -> Self {
-        Self {
-            extended_running_features,
-            extended_cycling_features,
-            extended_swimming_features,
-            gym_mode,
-            _reserved: Default::default(),
-            manufacturer_specific_feature_0,
-            manufacturer_specific_feature_1,
-        }
-    }
-}
-
 /// This struct represents datapage 6 in the heart rate profile.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct Capabilities {
+    #[new(value = "DataPageNumbers::Capabilities.into()")]
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
+    #[new(default)]
     #[packed_field(bytes = "1")]
     _reserved: ReservedOnes<packed_bits::Bits8>,
     #[packed_field(bytes = "2")]
@@ -314,53 +196,24 @@ pub struct Capabilities {
     pub common: CommonData,
 }
 
-impl Capabilities {
-    pub fn new(
-        page_change_toggle: bool,
-        features_supported: Features,
-        features_enabled: Features,
-        common: CommonData,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::Capabilities.into(),
-            page_change_toggle,
-            _reserved: Default::default(),
-            features_supported,
-            features_enabled,
-            common,
-        }
-    }
-}
-
 // Note we cannot reuse the common datapage battery fields because HR does not define bit 7
-#[derive(PackedStruct, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct DescriptiveBitField {
     #[packed_field(bits = "0:3")]
     pub coarse_battery_voltage: Integer<u8, packed_bits::Bits4>,
     #[packed_field(bits = "4:6", ty = "enum")]
     pub battery_status: BatteryStatusField,
+    #[new(default)]
     #[packed_field(bits = "7")]
     _reserved: ReservedZeroes<packed_bits::Bits1>,
 }
 
-impl DescriptiveBitField {
-    pub fn new(
-        coarse_battery_voltage: Integer<u8, packed_bits::Bits4>,
-        battery_status: BatteryStatusField,
-    ) -> Self {
-        Self {
-            coarse_battery_voltage,
-            battery_status,
-            _reserved: Default::default(),
-        }
-    }
-}
-
 /// This struct represents datapage 7 in the heart rate profile.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct BatteryStatus {
+    #[new(value = "DataPageNumbers::BatteryStatus.into()")]
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
@@ -375,26 +228,6 @@ pub struct BatteryStatus {
     pub common: CommonData,
 }
 
-impl BatteryStatus {
-    pub fn new(
-        page_change_toggle: bool,
-        battery_level: u8,
-        fractional_battery_voltage: u8,
-        coarse_battery_voltage: Integer<u8, packed_bits::Bits4>,
-        battery_status: BatteryStatusField,
-        common: CommonData,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::BatteryStatus.into(),
-            page_change_toggle,
-            battery_level,
-            fractional_battery_voltage,
-            descriptive_bit_field: DescriptiveBitField::new(coarse_battery_voltage, battery_status),
-            common,
-        }
-    }
-}
-
 #[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
 pub enum HeartbeatEventType {
     MeasuredTimestamp = 0,
@@ -402,38 +235,24 @@ pub enum HeartbeatEventType {
 }
 
 /// This struct represents datapage 9 in the heart rate profile.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct DeviceInformation {
+    #[new(value = "DataPageNumbers::DeviceInformation.into()")]
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
+    #[new(default)]
     #[packed_field(bits = "8:13")]
     _reserved0: ReservedOnes<packed_bits::Bits6>,
     #[packed_field(bits = "14:15", ty = "enum")]
     pub heartbeat_event_type: HeartbeatEventType,
+    #[new(default)]
     #[packed_field(bytes = "2:3")]
     _reserved1: ReservedOnes<packed_bits::Bits16>,
     #[packed_field(bytes = "4:7")]
     pub common: CommonData,
-}
-
-impl DeviceInformation {
-    pub fn new(
-        page_change_toggle: bool,
-        heartbeat_event_type: HeartbeatEventType,
-        common: CommonData,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::DeviceInformation.into(),
-            page_change_toggle,
-            _reserved0: Default::default(),
-            heartbeat_event_type,
-            _reserved1: Default::default(),
-            common,
-        }
-    }
 }
 
 #[derive(PackedStruct, PartialEq, Copy, Clone, Debug)]
@@ -455,11 +274,13 @@ pub struct FeatureField {
 }
 
 /// This struct represents datapage 32 in the heart rate profile.
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "8")]
 pub struct HRFeatureCommand {
+    #[new(value = "DataPageNumbers::HRFeatureCommand.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1:5")]
     _reserved: ReservedOnes<packed_bits::Bits40>,
     #[packed_field(bytes = "6")]
@@ -468,20 +289,9 @@ pub struct HRFeatureCommand {
     pub features: FeatureField,
 }
 
-impl HRFeatureCommand {
-    pub fn new(apply: ApplyField, features: FeatureField) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::HRFeatureCommand.to_primitive(),
-            _reserved: Default::default(),
-            apply,
-            features,
-        }
-    }
-}
-
 /// This struct represents datapage 112-127 in the heart rate profile.
 /// The data section is open to interpretation by the implementer
-#[derive(PackedStruct, DataPage, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "8")]
 pub struct ManufacturerSpecific {
     #[packed_field(bits = "1:7")]
@@ -492,22 +302,6 @@ pub struct ManufacturerSpecific {
     pub data: [u8; 3],
     #[packed_field(bytes = "4:7")]
     pub common: CommonData,
-}
-
-impl ManufacturerSpecific {
-    pub fn new(
-        data_page_number: Integer<u8, packed_bits::Bits7>,
-        page_change_toggle: bool,
-        data: [u8; 3],
-        common: CommonData,
-    ) -> Self {
-        Self {
-            data_page_number,
-            page_change_toggle,
-            data,
-            common,
-        }
-    }
 }
 
 // TODO invert tests to check bytes so reserved fields are checked

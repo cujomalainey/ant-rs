@@ -8,25 +8,19 @@
 
 use crate::messages::{AntAutoPackWithExtention, TransmitableMessage, TxMessage, TxMessageId};
 use ant_derive::AntTx;
+use derive_new::new;
 use packed_struct::prelude::*;
 
 // Re-export reused types
 pub use crate::messages::requested_response::{EncryptionId, UserInformationString};
 
 /// Represents a UnAssign Channel Message (0x41)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
 pub struct UnAssignChannel {
     /// Channel to be unassigned
     #[packed_field(bytes = "0")]
     pub channel_number: u8,
-}
-
-impl UnAssignChannel {
-    /// Creates a new UnAssign Channel message
-    pub fn new(channel_number: u8) -> Self {
-        Self { channel_number }
-    }
 }
 
 // Note, this is bit shifted 4 bits relative to the offical doc because the field would overlap in
@@ -95,6 +89,7 @@ AntAutoPackWithExtention!(
 );
 
 impl AssignChannel {
+    // TODO change wording to match macro
     /// Creates a new Assign Channel message
     pub fn new(
         channel_number: u8,
@@ -130,13 +125,14 @@ pub enum TransmissionGlobalDataPages {
     GlobalDataPagesUsed = 1,
 }
 
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct TransmissionType {
     #[packed_field(bits = "0:1", ty = "enum")]
     pub transmission_channel_type: TransmissionChannelType,
     #[packed_field(bits = "2", ty = "enum")]
     pub global_datapages_used: TransmissionGlobalDataPages,
+    #[new(default)]
     #[packed_field(bits = "3")]
     _reserved: ReservedZeroes<packed_bits::Bits1>,
     // TODO alias this type when https://github.com/hashmismatch/packed_struct.rs/issues/86 is
@@ -146,19 +142,6 @@ pub struct TransmissionType {
 }
 
 impl TransmissionType {
-    pub fn new(
-        transmission_channel_type: TransmissionChannelType,
-        global_datapages_used: TransmissionGlobalDataPages,
-        device_number_extension: Integer<u8, packed_bits::Bits4>,
-    ) -> Self {
-        Self {
-            transmission_channel_type,
-            global_datapages_used,
-            device_number_extension,
-            ..TransmissionType::default()
-        }
-    }
-
     pub fn wildcard(&mut self) {
         self.transmission_channel_type = TransmissionChannelType::Reserved;
         self.global_datapages_used = TransmissionGlobalDataPages::GlobalDataPagesNotUsed;
@@ -175,7 +158,7 @@ impl TransmissionType {
     }
 }
 
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct DeviceType {
     #[packed_field(bits = "0:6")]
@@ -185,13 +168,6 @@ pub struct DeviceType {
 }
 
 impl DeviceType {
-    pub fn new(device_type_id: Integer<u8, packed_bits::Bits7>, pairing_request: bool) -> Self {
-        Self {
-            device_type_id,
-            pairing_request,
-        }
-    }
-
     pub fn wildcard(&mut self) {
         self.pairing_request = false;
         self.device_type_id = 0.into();
@@ -208,7 +184,7 @@ impl DeviceType {
 /// Represents a Channel Id message (0x51)
 ///
 /// This message is both RX and TX capable
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "5")]
 pub struct ChannelId {
     /// Channel number to configure or from request
@@ -235,21 +211,6 @@ pub struct ChannelId {
 }
 
 impl ChannelId {
-    /// Creates a new ChannelId message
-    pub fn new(
-        channel_number: u8,
-        device_number: u16,
-        device_type: DeviceType,
-        transmission_type: TransmissionType,
-    ) -> Self {
-        Self {
-            channel_number,
-            device_number,
-            device_type,
-            transmission_type,
-        }
-    }
-
     /// Set all fields to their wildcard values
     pub fn wildcard(&mut self) {
         self.device_number = 0;
@@ -269,7 +230,7 @@ impl ChannelId {
 }
 
 /// Represents a Channel Period message (0x43)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct ChannelPeriod {
     /// Channel to be configured
@@ -282,18 +243,8 @@ pub struct ChannelPeriod {
     pub channel_period: u16,
 }
 
-impl ChannelPeriod {
-    /// Creates a new Channel Period message
-    pub fn new(channel_number: u8, channel_period: u16) -> Self {
-        Self {
-            channel_number,
-            channel_period,
-        }
-    }
-}
-
 /// Represents a Search Timeout message (0x44)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct SearchTimeout {
     /// Channel to configured
@@ -308,18 +259,8 @@ pub struct SearchTimeout {
     pub search_timeout: u8,
 }
 
-impl SearchTimeout {
-    /// Creates a new Search Timeout message
-    pub fn new(channel_number: u8, search_timeout: u8) -> Self {
-        Self {
-            channel_number,
-            search_timeout,
-        }
-    }
-}
-
 /// Represents a Channel RF Frequency (0x45)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct ChannelRfFrequency {
     /// Channel to be configured
@@ -332,21 +273,11 @@ pub struct ChannelRfFrequency {
     pub rf_frequency: u8,
 }
 
-impl ChannelRfFrequency {
-    /// Creates a new Channel RF Frequency message
-    pub fn new(channel_number: u8, rf_frequency: u8) -> Self {
-        Self {
-            channel_number,
-            rf_frequency,
-        }
-    }
-}
-
 /// Size of a default network key
 pub const NETWORK_KEY_SIZE: usize = 8;
 
 /// Represents a Set Network Key message (0x46)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "9")]
 pub struct SetNetworkKey {
     /// Network number to be used
@@ -361,22 +292,13 @@ pub struct SetNetworkKey {
     pub network_key: [u8; 8], // AKA NETWORK_KEY_SIZE but PackedStruct doens't like const
 }
 
-impl SetNetworkKey {
-    /// Creates a new Set Network Key message
-    pub fn new(network_number: u8, network_key: [u8; NETWORK_KEY_SIZE]) -> Self {
-        Self {
-            network_number,
-            network_key,
-        }
-    }
-}
-
 /// Represents a Transmit Power message (0x47)
 ///
 /// Same as [SetChannelTransmitPower] but for all channels
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct TransmitPower {
+    #[new(default)]
     #[packed_field(bytes = "0")]
     _reserved: ReservedZeroes<packed_bits::Bits8>,
     /// Sets TX power for all channels
@@ -384,16 +306,6 @@ pub struct TransmitPower {
     /// Dbm correlation is chip dependent, please chip and ANT messaging documentation
     #[packed_field(bytes = "1")]
     pub tx_power: u8,
-}
-
-impl TransmitPower {
-    /// Creates a new Transmit Power message
-    pub fn new(tx_power: u8) -> Self {
-        Self {
-            tx_power,
-            ..Self::default()
-        }
-    }
 }
 
 #[derive(PrimitiveEnum_u16, Clone, Copy, PartialEq, Debug, Default)]
@@ -404,7 +316,7 @@ pub enum SearchWaveformValue {
 }
 
 /// Represents a Search Waveform message (0x49)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct SearchWaveform {
     /// Channel to be configured
@@ -419,18 +331,8 @@ pub struct SearchWaveform {
     pub waveform: EnumCatchAll<SearchWaveformValue>,
 }
 
-impl SearchWaveform {
-    /// Creates a new Search Waveform message
-    pub fn new(channel_number: u8, waveform: EnumCatchAll<SearchWaveformValue>) -> Self {
-        Self {
-            channel_number,
-            waveform,
-        }
-    }
-}
-
 /// Represents a Add Channel ID To List message (0x59)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "6")]
 pub struct AddChannelIdToList {
     /// Channel list to be modified
@@ -450,27 +352,8 @@ pub struct AddChannelIdToList {
     pub list_index: u8,
 }
 
-impl AddChannelIdToList {
-    /// Creates a new Add Channel ID To List message
-    pub fn new(
-        channel_number: u8,
-        device_number: u16,
-        device_type: DeviceType,
-        transmission_type: TransmissionType,
-        list_index: u8,
-    ) -> Self {
-        Self {
-            channel_number,
-            device_number,
-            device_type,
-            transmission_type,
-            list_index,
-        }
-    }
-}
-
 /// Represents a Add Encryption ID To List message (0x59)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "6")]
 pub struct AddEncryptionIdToList {
     /// Channel list to be modified
@@ -484,17 +367,6 @@ pub struct AddEncryptionIdToList {
     pub list_index: u8,
 }
 
-impl AddEncryptionIdToList {
-    /// Creates a new Add Encryption ID To List message
-    pub fn new(channel_number: u8, encryption_id: [u8; 4], list_index: u8) -> Self {
-        Self {
-            channel_number,
-            encryption_id,
-            list_index,
-        }
-    }
-}
-
 #[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum ListExclusion {
     #[default]
@@ -503,7 +375,7 @@ pub enum ListExclusion {
 }
 
 /// Represents a Config ID List message (0x5A)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct ConfigIdList {
     /// Channel number's list to be configured
@@ -517,17 +389,6 @@ pub struct ConfigIdList {
     pub exclude: ListExclusion,
 }
 
-impl ConfigIdList {
-    /// Creates a new Config ID List message
-    pub fn new(channel_number: u8, list_size: u8, exclude: ListExclusion) -> Self {
-        Self {
-            channel_number,
-            list_size,
-            exclude,
-        }
-    }
-}
-
 #[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum ListType {
     #[default]
@@ -536,7 +397,7 @@ pub enum ListType {
 }
 
 /// Represents a Config Encryption ID List message (0x5A)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct ConfigEncryptionIdList {
     /// Channel's number to be configured
@@ -550,21 +411,10 @@ pub struct ConfigEncryptionIdList {
     pub list_type: ListType,
 }
 
-impl ConfigEncryptionIdList {
-    /// Creates a new Config Encryption ID List message
-    pub fn new(channel_number: u8, list_size: u8, list_type: ListType) -> Self {
-        Self {
-            channel_number,
-            list_size,
-            list_type,
-        }
-    }
-}
-
 /// Represents a Set Channel Transmit Power message (0x60)
 ///
 /// Same as [TransmitPower] but only for a single channel
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct SetChannelTransmitPower {
     /// Channel to be configured
@@ -575,18 +425,8 @@ pub struct SetChannelTransmitPower {
     pub transmit_power: u8,
 }
 
-impl SetChannelTransmitPower {
-    /// Creates a new Set Channel Transmit Power message
-    pub fn new(channel_number: u8, transmit_power: u8) -> Self {
-        Self {
-            channel_number,
-            transmit_power,
-        }
-    }
-}
-
 /// Represents a Low Priority Search Timeout message (0x63)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct LowPrioritySearchTimeout {
     /// Channel to be configured
@@ -597,20 +437,10 @@ pub struct LowPrioritySearchTimeout {
     pub search_timeout: u8,
 }
 
-impl LowPrioritySearchTimeout {
-    /// Creates a Low Priority Search Timeout message
-    pub fn new(channel_number: u8, search_timeout: u8) -> Self {
-        Self {
-            channel_number,
-            search_timeout,
-        }
-    }
-}
-
 /// Represents a Serial Number Set Channel Id message (0x65)
 ///
 /// This message is not available in softdevice mode
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct SerialNumberSetChannelId {
     /// Channel to be configured
@@ -624,25 +454,11 @@ pub struct SerialNumberSetChannelId {
     pub transmission_type: TransmissionType,
 }
 
-impl SerialNumberSetChannelId {
-    /// Creates a new Serial Number Set Channel Id message
-    pub fn new(
-        channel_number: u8,
-        device_type_id: DeviceType,
-        transmission_type: TransmissionType,
-    ) -> Self {
-        Self {
-            channel_number,
-            device_type_id,
-            transmission_type,
-        }
-    }
-}
-
 /// Represents a Enable Ext Rx Messages message (0x66)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct EnableExtRxMessages {
+    #[new(default)]
     #[packed_field(bits = "0:14")]
     _reserved: ReservedZeroes<packed_bits::Bits15>,
     /// enable extended messages
@@ -650,20 +466,11 @@ pub struct EnableExtRxMessages {
     pub enable: bool,
 }
 
-impl EnableExtRxMessages {
-    /// Creates a new Enable Ext Rx Messages message
-    pub fn new(enable: bool) -> Self {
-        Self {
-            enable,
-            ..Self::default()
-        }
-    }
-}
-
 /// Represents an Enable LED message (0x68)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct EnableLed {
+    #[new(default)]
     #[packed_field(bits = "0:14")]
     _reserved: ReservedZeroes<packed_bits::Bits15>,
     #[packed_field(bits = "15")]
@@ -671,35 +478,20 @@ pub struct EnableLed {
     pub enable: bool,
 }
 
-impl EnableLed {
-    /// Creates a new Enable LED message
-    pub fn new(enable: bool) -> Self {
-        Self {
-            enable,
-            ..Self::default()
-        }
-    }
-}
-
 /// Represents a Crystal Enable message (0x6D)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
 pub struct CrystalEnable {
+    #[new(default)]
     #[packed_field(bytes = "0")]
     _reserved: ReservedZeroes<packed_bits::Bits8>,
 }
 
-impl CrystalEnable {
-    /// Creates a new Crystal Enable message
-    pub fn new() -> Self {
-        Self { ..Self::default() }
-    }
-}
-
 /// Represents a Lib Config message (0x6E)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct LibConfig {
+    #[new(default)]
     #[packed_field(bytes = "0")]
     _reserved0: ReservedZeroes<packed_bits::Bits8>,
     #[packed_field(bits = "8")]
@@ -708,27 +500,13 @@ pub struct LibConfig {
     pub enable_rssi_output: bool,
     #[packed_field(bits = "10")]
     pub enable_rx_timestamp_output: bool,
+    #[new(default)]
     #[packed_field(bits = "11:15")]
     _reserved1: ReservedZeroes<packed_bits::Bits5>,
 }
 
-impl LibConfig {
-    pub fn new(
-        enable_channel_id_output: bool,
-        enable_rssi_output: bool,
-        enable_rx_timestamp_output: bool,
-    ) -> Self {
-        Self {
-            enable_channel_id_output,
-            enable_rssi_output,
-            enable_rx_timestamp_output,
-            ..LibConfig::default()
-        }
-    }
-}
-
 /// Represents a Frequency Agility message (0x70)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "4")]
 pub struct FrequencyAgility {
     /// Channel number to be configured
@@ -757,20 +535,8 @@ impl Default for FrequencyAgility {
     }
 }
 
-impl FrequencyAgility {
-    /// Creates a new Frequency Agility message
-    pub fn new(channel_number: u8, frequency_1: u8, frequency_2: u8, frequency_3: u8) -> Self {
-        Self {
-            channel_number,
-            frequency_1,
-            frequency_2,
-            frequency_3,
-        }
-    }
-}
-
 /// Represents a Proximity Search message (0x71)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct ProximitySearch {
     /// Channel to be configured
@@ -781,16 +547,6 @@ pub struct ProximitySearch {
     pub search_threshold: u8,
 }
 
-impl ProximitySearch {
-    /// Creates a new Proximity Search message
-    pub fn new(channel_number: u8, search_threshold: u8) -> Self {
-        Self {
-            channel_number,
-            search_threshold,
-        }
-    }
-}
-
 #[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum EventBufferConfig {
     #[default]
@@ -799,9 +555,10 @@ pub enum EventBufferConfig {
 }
 
 /// Represents a Configure Event Buffer message (0x74)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "6")]
 pub struct ConfigureEventBuffer {
+    #[new(default)]
     #[packed_field(bytes = "0")]
     _reserved: ReservedZeroes<packed_bits::Bits8>,
     /// Defines which events to buffer
@@ -815,20 +572,8 @@ pub struct ConfigureEventBuffer {
     pub time: u16,
 }
 
-impl ConfigureEventBuffer {
-    /// Creates a new Configure Event Buffer message
-    pub fn new(config: EventBufferConfig, size: u16, time: u16) -> Self {
-        Self {
-            config,
-            size,
-            time,
-            ..Self::default()
-        }
-    }
-}
-
 /// Represents a Channel Search Priority message (0x75)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct ChannelSearchPriority {
     /// Channel to be configured
@@ -839,18 +584,8 @@ pub struct ChannelSearchPriority {
     pub search_priority: u8,
 }
 
-impl ChannelSearchPriority {
-    /// Creates a new Channel Search Priority message
-    pub fn new(channel_number: u8, search_priority: u8) -> Self {
-        Self {
-            channel_number,
-            search_priority,
-        }
-    }
-}
-
 /// Represents a Set 128 Bit Network Key message (0x76)
-#[derive(PackedStruct, AntTx, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "17")]
 pub struct Set128BitNetworkKey {
     /// Network number to be used
@@ -861,16 +596,6 @@ pub struct Set128BitNetworkKey {
     /// Network key to be used
     #[packed_field(bytes = "1:16")]
     pub network_key: [u8; 16],
-}
-
-impl Set128BitNetworkKey {
-    /// Creates a new Set 128-Bit Network Key message
-    pub fn new(network_number: u8, network_key: [u8; 16]) -> Self {
-        Self {
-            network_number,
-            network_key,
-        }
-    }
 }
 
 /// Contains the mandatory fields for HighDutySearch
@@ -885,25 +610,16 @@ pub struct HighDutySearchData {
 }
 
 /// Optional fields for HighDutySearch
-#[derive(PackedStruct, Clone, Copy, Debug, PartialEq)]
+#[derive(PackedStruct, new, Clone, Copy, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct HighDutySearchSuppressionCycle {
+    #[new(default)]
     #[packed_field(bits = "3:7")]
     _reserved: ReservedZeroes<packed_bits::Bits5>,
     /// high priority search suppression in increments of 250ms, limit is 5 and is full
     /// suppression, 0 is no suppression
     #[packed_field(bits = "0:2")]
     suppression_cycle: u8,
-}
-
-impl HighDutySearchSuppressionCycle {
-    /// Creates a new HighDutySearchSuppressionCycle
-    pub fn new(suppression_cycle: u8) -> Self {
-        Self {
-            suppression_cycle,
-            ..Self::default()
-        }
-    }
 }
 
 impl Default for HighDutySearchSuppressionCycle {
@@ -948,30 +664,24 @@ pub enum AdvancedBurstMaxPacketLength {
     Max24Byte = 0x03,
 }
 
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct SupportedFeatures {
+    #[new(default)]
     #[packed_field(bits = "0:6")]
     _reserved: ReservedZeroes<packed_bits::Bits7>,
     #[packed_field(bits = "7")]
     pub adv_burst_frequency_hop_enabled: bool,
+    #[new(default)]
     #[packed_field(bits = "8:23")]
     _reserved1: ReservedZeroes<packed_bits::Bits16>,
 }
 
-impl SupportedFeatures {
-    pub fn new(adv_burst_frequency_hop_enabled: bool) -> Self {
-        Self {
-            adv_burst_frequency_hop_enabled,
-            ..Self::default()
-        }
-    }
-}
-
 /// Represents Configure Advanced Burst required fields
-#[derive(PackedStruct, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "9")]
 pub struct ConfigureAdvancedBurstData {
+    #[new(default)]
     #[packed_field(bits = "0:14")]
     _reserved: ReservedZeroes<packed_bits::Bits15>,
     /// enable/disable advanced burst
@@ -1107,9 +817,11 @@ impl ConfigureAdvancedBurst {
 }
 
 /// Represents a Configure Event Filter message (0x79)
-#[derive(PackedStruct, AntTx, Clone, Debug, Default, PartialEq)]
+#[allow(clippy::too_many_arguments)]
+#[derive(PackedStruct, AntTx, new, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct ConfigureEventFilter {
+    #[new(default)]
     #[packed_field(bytes = "0")]
     _reserved0: ReservedZeroes<packed_bits::Bits8>,
     /// filter out rx search time out events
@@ -1142,42 +854,13 @@ pub struct ConfigureEventFilter {
     /// filter out event transfer tx start
     #[packed_field(bits = "22")]
     pub filter_event_transfer_tx_start: bool,
+    #[new(default)]
     #[packed_field(bits = "16:21")]
     _reserved1: ReservedZeroes<packed_bits::Bits8>,
 }
 
-impl ConfigureEventFilter {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        filter_event_rx_search_timeout: bool,
-        filter_event_rx_fail: bool,
-        filter_event_tx: bool,
-        filter_event_transfer_rx_failed: bool,
-        filter_event_transfer_tx_completed: bool,
-        filter_event_transfer_tx_failed: bool,
-        filter_event_channel_closed: bool,
-        filter_event_rx_fail_go_to_search: bool,
-        filter_event_channel_collision: bool,
-        filter_event_transfer_tx_start: bool,
-    ) -> Self {
-        Self {
-            filter_event_rx_search_timeout,
-            filter_event_rx_fail,
-            filter_event_tx,
-            filter_event_transfer_rx_failed,
-            filter_event_transfer_tx_completed,
-            filter_event_transfer_tx_failed,
-            filter_event_channel_closed,
-            filter_event_rx_fail_go_to_search,
-            filter_event_channel_collision,
-            filter_event_transfer_tx_start,
-            ..Self::default()
-        }
-    }
-}
-
 /// Represents a Configure Selective Data Updates message (0x7A)
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct ConfigureSelectiveDataUpdates {
     /// Channel to be configured
@@ -1190,17 +873,8 @@ pub struct ConfigureSelectiveDataUpdates {
 }
 // TODO test
 
-impl ConfigureSelectiveDataUpdates {
-    pub fn new(channel_number: u8, selected_data: u8) -> Self {
-        Self {
-            channel_number,
-            selected_data,
-        }
-    }
-}
-
 /// Represents a Set Selective Data Update Mask message (0x7B)
-#[derive(PackedStruct, AntTx, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "9")]
 pub struct SetSelectiveDataUpdateMask {
     /// Mask to updated
@@ -1217,15 +891,6 @@ pub struct SetSelectiveDataUpdateMask {
     pub sdu_mask: [u8; 8],
 }
 
-impl SetSelectiveDataUpdateMask {
-    pub fn new(sdu_mask_number: u8, sdu_mask: [u8; 8]) -> Self {
-        Self {
-            sdu_mask_number,
-            sdu_mask,
-        }
-    }
-}
-
 // TODO configure user nvme message
 
 #[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
@@ -1237,7 +902,7 @@ pub enum EncryptionMode {
 }
 
 /// Represents a Enable Single Channel Encryption message (0x7D)
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "4")]
 pub struct EnableSingleChannelEncryption {
     /// Channel to be configured
@@ -1247,6 +912,7 @@ pub struct EnableSingleChannelEncryption {
     #[packed_field(bytes = "1", ty = "enum")]
     pub encryption_mode: EncryptionMode,
     /// Per version 5.1 of the spec this field has a range of 0
+    #[new(default)]
     #[packed_field(bytes = "2")]
     pub volatile_key_index: ReservedZeroes<packed_bits::Bits8>,
     /// Master channel rate / slave tracking channel rate
@@ -1254,103 +920,63 @@ pub struct EnableSingleChannelEncryption {
     pub decimation_rate: u8,
 }
 
-impl EnableSingleChannelEncryption {
-    pub fn new(channel_number: u8, encryption_mode: EncryptionMode, decimation_rate: u8) -> Self {
-        Self {
-            channel_number,
-            encryption_mode,
-            decimation_rate,
-            ..Self::default()
-        }
-    }
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "17")]
 pub struct SetEncryptionKey {
-    // Per version 5.1 of the spec this field has a range of 0
+    /// Per version 5.1 of the spec this field has a range of 0
+    #[new(default)]
     #[packed_field(bytes = "0")]
     pub volatile_key_index: ReservedZeroes<packed_bits::Bits8>,
     #[packed_field(bytes = "1:16")]
     pub encryption_key: [u8; 16],
 }
 
-impl SetEncryptionKey {
-    pub fn new(encryption_key: [u8; 16]) -> Self {
-        Self {
-            encryption_key,
-            ..Self::default()
-        }
-    }
-}
-
 // The spec defines this as a single variable message but variable types are
 // basically impossible with the packed_stuct lib so it is easier to just
 // implement 3 message types to handle all the cases.
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "5")]
 pub struct SetEncryptionInfoEncryptionId {
     // 0 for encryption id
+    #[new(default)]
     #[packed_field(bytes = "0")]
     pub set_parameter: ReservedZeroes<packed_bits::Bits8>,
     #[packed_field(bytes = "1:4")]
     pub encryption_id: EncryptionId,
 }
 
-impl SetEncryptionInfoEncryptionId {
-    pub fn new(encryption_id: EncryptionId) -> Self {
-        Self {
-            encryption_id,
-            ..Self::default()
-        }
-    }
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "20")]
 pub struct SetEncryptionInfoUserInformationString {
     // 1 for User Information String
+    #[new(default)]
     #[packed_field(bits = "0:6")]
     pub set_parameter0: ReservedZeroes<packed_bits::Bits7>,
+    #[new(default)]
     #[packed_field(bits = "7")]
     pub set_parameter1: ReservedOnes<packed_bits::Bits1>,
     #[packed_field(bytes = "1:19")]
     pub user_information_string: UserInformationString,
 }
 
-impl SetEncryptionInfoUserInformationString {
-    pub fn new(user_information_string: UserInformationString) -> Self {
-        Self {
-            user_information_string,
-            ..Self::default()
-        }
-    }
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "17")]
 pub struct SetEncryptionInfoRandomSeed {
     // 2 for Random Number Seed
+    #[new(default)]
     #[packed_field(bits = "0:5")]
     pub set_parameter0: ReservedZeroes<packed_bits::Bits6>,
+    #[new(default)]
     #[packed_field(bits = "6")]
     pub set_parameter1: ReservedOnes<packed_bits::Bits1>,
+    #[new(default)]
     #[packed_field(bits = "7")]
     pub set_parameter2: ReservedZeroes<packed_bits::Bits1>,
     #[packed_field(bytes = "1:16")]
     pub random_seed: [u8; 16],
 }
 
-impl SetEncryptionInfoRandomSeed {
-    pub fn new(random_seed: [u8; 16]) -> Self {
-        Self {
-            random_seed,
-            ..Self::default()
-        }
-    }
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct ChannelSearchSharing {
     #[packed_field(bytes = "0")]
@@ -1359,57 +985,33 @@ pub struct ChannelSearchSharing {
     pub search_sharing_cycles: u8,
 }
 
-impl ChannelSearchSharing {
-    pub fn new(channel_number: u8, search_sharing_cycles: u8) -> Self {
-        Self {
-            channel_number,
-            search_sharing_cycles,
-        }
-    }
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct LoadEncryptionKeyFromNvm {
+    #[new(default)]
     #[packed_field(bytes = "0")]
     pub operation: ReservedZeroes<packed_bits::Bits8>,
     #[packed_field(bytes = "1")]
     pub nvm_key_index: u8,
     // 0 per spec v5.1
+    #[new(default)]
     #[packed_field(bytes = "2")]
     volatile_key_index: ReservedZeroes<packed_bits::Bits8>,
 }
 
-impl LoadEncryptionKeyFromNvm {
-    pub fn new(nvm_key_index: u8) -> Self {
-        Self {
-            nvm_key_index,
-            ..Self::default()
-        }
-    }
-}
-
-#[derive(PackedStruct, AntTx, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "18")]
 pub struct StoreEncryptionKeyInNvm {
+    #[new(default)]
     #[packed_field(bits = "0:6")]
     pub operation0: ReservedZeroes<packed_bits::Bits7>,
+    #[new(default)]
     #[packed_field(bits = "7")]
     pub operation1: ReservedOnes<packed_bits::Bits1>,
     #[packed_field(bytes = "1")]
     pub nvm_key_index: u8,
     #[packed_field(bytes = "2:17")]
     pub encryption_key: [u8; 16],
-}
-
-impl StoreEncryptionKeyInNvm {
-    pub fn new(nvm_key_index: u8, encryption_key: [u8; 16]) -> Self {
-        Self {
-            nvm_key_index,
-            encryption_key,
-            ..Self::default()
-        }
-    }
 }
 
 // TODO SetUsbDescriptorString

@@ -8,6 +8,7 @@
 
 use crate::messages::config::{DeviceType, TransmissionType};
 use ant_derive::DataPage;
+use derive_new::new;
 use packed_struct::prelude::*;
 
 use core::ops::RangeInclusive;
@@ -36,9 +37,10 @@ pub enum DataPageNumbers {
 }
 
 // TODO get field information from ANTFS spec
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct AntFsClientBeacon {
+    #[new(value = "DataPageNumbers::AntFsClientBeacon.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
     #[packed_field(bytes = "1")]
@@ -51,43 +53,17 @@ pub struct AntFsClientBeacon {
     pub device_descriptor_host_serial_number: [u8; 4],
 }
 
-impl AntFsClientBeacon {
-    pub fn new(
-        status_byte_1: u8,
-        status_byte_2: u8,
-        authentication_type: u8,
-        device_descriptor_host_serial_number: [u8; 4],
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::AntFsClientBeacon.to_primitive(),
-            status_byte_1,
-            status_byte_2,
-            authentication_type,
-            device_descriptor_host_serial_number,
-        }
-    }
-}
-
 // TODO get field information from ANTFS spec
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct AntFsHostCommandResponse {
+    #[new(value = "DataPageNumbers::AntFsHostCommandResponse.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
     #[packed_field(bytes = "1")]
     pub command: u8,
     #[packed_field(bytes = "2:7")]
     pub parameters: [u8; 6],
-}
-
-impl AntFsHostCommandResponse {
-    pub fn new(command: u8, parameters: [u8; 6]) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::AntFsHostCommandResponse.to_primitive(),
-            command,
-            parameters,
-        }
-    }
 }
 
 // TODO add custom functions to set transmit until acked
@@ -108,9 +84,10 @@ pub enum CommandType {
     RequestDataPageSet = 4,
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct RequestDataPage {
+    #[new(value = "DataPageNumbers::RequestDataPage.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
     #[packed_field(bytes = "1:2")]
@@ -127,27 +104,6 @@ pub struct RequestDataPage {
     pub command_type: CommandType,
 }
 
-impl RequestDataPage {
-    pub fn new(
-        slave_serial_number: u16,
-        descriptor_byte_1: u8,
-        descriptor_byte_2: u8,
-        requested_transmission_response: RequestedTransmissionResponse,
-        requested_page_number: u8,
-        command_type: CommandType,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::RequestDataPage.to_primitive(),
-            slave_serial_number,
-            descriptor_byte_1,
-            descriptor_byte_2,
-            requested_transmission_response,
-            requested_page_number,
-            command_type,
-        }
-    }
-}
-
 #[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug, Default)]
 pub enum CommandStatusValue {
     Pass = 0,
@@ -159,9 +115,10 @@ pub enum CommandStatusValue {
     Uninitialized = 255,
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct CommandStatus {
+    #[new(value = "DataPageNumbers::CommandStatus.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
     #[packed_field(bytes = "1")]
@@ -172,23 +129,6 @@ pub struct CommandStatus {
     pub command_status: CommandStatusValue,
     #[packed_field(bytes = "4:7")]
     pub data: [u8; 4],
-}
-
-impl CommandStatus {
-    pub fn new(
-        last_received_command_id: u8,
-        sequence_number: u8,
-        command_status: CommandStatusValue,
-        data: [u8; 4],
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::CommandStatus.to_primitive(),
-            last_received_command_id,
-            sequence_number,
-            command_status,
-            data,
-        }
-    }
 }
 
 pub enum GenericCommandType {
@@ -209,9 +149,10 @@ impl From<u16> for GenericCommandType {
     }
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct GenericCommandPage {
+    #[new(value = "DataPageNumbers::GenericCommandPage.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
     #[packed_field(bytes = "1:2")]
@@ -225,29 +166,15 @@ pub struct GenericCommandPage {
 }
 
 impl GenericCommandPage {
-    pub fn new(
-        slave_serial_number: u16,
-        slave_manufacturer_id: u16,
-        sequence_number: u8,
-        command_number: u16,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::GenericCommandPage.to_primitive(),
-            slave_serial_number,
-            slave_manufacturer_id,
-            sequence_number,
-            command_number,
-        }
-    }
-
     pub fn get_generic_command(&self) -> GenericCommandType {
         self.command_number.into()
     }
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct OpenChannelCommand {
+    #[new(value = "DataPageNumbers::OpenChannelCommand.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
     #[packed_field(bytes = "1:3")]
@@ -258,23 +185,6 @@ pub struct OpenChannelCommand {
     pub rf_frequency: u8,
     #[packed_field(bytes = "6:7")]
     pub channel_period: u16,
-}
-
-impl OpenChannelCommand {
-    pub fn new(
-        serial_number: Integer<u32, packed_bits::Bits24>,
-        device_type: DeviceType,
-        rf_frequency: u8,
-        channel_period: u16,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::OpenChannelCommand.to_primitive(),
-            serial_number,
-            device_type,
-            rf_frequency,
-            channel_period,
-        }
-    }
 }
 
 // TODO fill in this enum from FIT SDK
@@ -295,28 +205,19 @@ pub enum SubSportMode {
     LapSwimming = 11,
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct ModeSettings {
+    #[new(value = "DataPageNumbers::ModeSettings.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1:5")]
-    pub _reserved: ReservedOnes<packed_bits::Bits40>,
+    _reserved: ReservedOnes<packed_bits::Bits40>,
     #[packed_field(bytes = "6", ty = "enum")]
     pub sub_sport_mode: SubSportMode,
     #[packed_field(bytes = "7", ty = "enum")]
     pub sport_mode: SportMode,
-}
-
-impl ModeSettings {
-    pub fn new(sport_mode: SportMode, sub_sport_mode: SubSportMode) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::ModeSettings.to_primitive(),
-            sub_sport_mode,
-            sport_mode,
-            _reserved: Default::default(),
-        }
-    }
 }
 
 #[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
@@ -339,32 +240,19 @@ pub struct CommonManufacturersInformation {
     pub model_number: u16,
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct MultiComponentSystemManufacturersInformation {
+    #[new(value = "DataPageNumbers::MultiComponentSystemManufacturersInformation.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1")]
     _reserved: ReservedOnes<packed_bits::Bits8>,
     #[packed_field(bytes = "2")]
     pub component_identifier: ComponentIdentifier,
     #[packed_field(bytes = "3:7")]
     pub commmon_manufacturers_information: CommonManufacturersInformation,
-}
-
-impl MultiComponentSystemManufacturersInformation {
-    pub fn new(
-        component_identifier: ComponentIdentifier,
-        commmon_manufacturers_information: CommonManufacturersInformation,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::MultiComponentSystemManufacturersInformation
-                .to_primitive(),
-            _reserved: Default::default(),
-            component_identifier,
-            commmon_manufacturers_information,
-        }
-    }
 }
 
 #[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
@@ -378,9 +266,10 @@ pub struct CommonProductInformation {
     pub serial_number: u32,
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct MultiComponentSystemProductInformation {
+    #[new(value = "DataPageNumbers::MultiComponentSystemProductInformation.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
     #[packed_field(bytes = "1")]
@@ -389,62 +278,32 @@ pub struct MultiComponentSystemProductInformation {
     pub common_product_information: CommonProductInformation,
 }
 
-impl MultiComponentSystemProductInformation {
-    pub fn new(
-        component_identifier: ComponentIdentifier,
-        common_product_information: CommonProductInformation,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::MultiComponentSystemProductInformation
-                .to_primitive(),
-            component_identifier,
-            common_product_information,
-        }
-    }
-}
-
 // TODO extract product and manufacter data info into separate struct for multi and regular
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct ManufacturersInformation {
+    #[new(value = "DataPageNumbers::ManufacturersInformation.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1:2")]
     _reserved: ReservedOnes<packed_bits::Bits16>,
     #[packed_field(bytes = "3:7")]
     pub commmon_manufacturers_information: CommonManufacturersInformation,
 }
 
-impl ManufacturersInformation {
-    pub fn new(commmon_manufacturers_information: CommonManufacturersInformation) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::ManufacturersInformation.to_primitive(),
-            _reserved: Default::default(),
-            commmon_manufacturers_information,
-        }
-    }
-}
-
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct ProductInformation {
+    #[new(value = "DataPageNumbers::ProductInformation.to_primitive()")]
     #[packed_field(bytes = "0")]
     pub data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1")]
     _reserved: ReservedOnes<packed_bits::Bits8>,
     #[packed_field(bytes = "2:7")]
     pub common_product_information: CommonProductInformation,
-}
-
-impl ProductInformation {
-    pub fn new(common_product_information: CommonProductInformation) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::ProductInformation.to_primitive(),
-            _reserved: Default::default(),
-            common_product_information,
-        }
-    }
 }
 
 #[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug, Default)]
@@ -461,7 +320,7 @@ pub enum BatteryStatusField {
 }
 
 // This is a copy o ComponentIdentifier but with its fields renamed to match the datasheet
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct BatteryIdentifier {
     #[packed_field(bits = "0:3")]
@@ -470,25 +329,13 @@ pub struct BatteryIdentifier {
     pub identifier: Integer<u8, packed_bits::Bits4>,
 }
 
-impl BatteryIdentifier {
-    pub fn new(
-        number_of_batteries: Integer<u8, packed_bits::Bits4>,
-        identifier: Integer<u8, packed_bits::Bits4>,
-    ) -> Self {
-        Self {
-            number_of_batteries,
-            identifier,
-        }
-    }
-}
-
 #[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
 pub enum OperatingTimeResolution {
     SixteenSecondResolution = 0,
     TwoSecondResolution = 1,
 }
 
-#[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct DescriptiveBitField {
     #[packed_field(bits = "0:3")]
@@ -499,25 +346,13 @@ pub struct DescriptiveBitField {
     pub operating_time_resolution: OperatingTimeResolution,
 }
 
-impl DescriptiveBitField {
-    pub fn new(
-        coarse_battery_voltage: Integer<u8, packed_bits::Bits4>,
-        battery_status: BatteryStatusField,
-        operating_time_resolution: OperatingTimeResolution,
-    ) -> Self {
-        Self {
-            coarse_battery_voltage,
-            battery_status,
-            operating_time_resolution,
-        }
-    }
-}
-
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct BatteryStatus {
+    #[new(value = "DataPageNumbers::BatteryStatus.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1")]
     _reserved: ReservedOnes<packed_bits::Bits8>,
     #[packed_field(bytes = "2")]
@@ -528,24 +363,6 @@ pub struct BatteryStatus {
     pub fractional_battery_voltage: u8,
     #[packed_field(bytes = "7")]
     pub descriptive_bit_field: DescriptiveBitField,
-}
-
-impl BatteryStatus {
-    pub fn new(
-        battery_identifier: BatteryIdentifier,
-        cumulative_operating_time: Integer<u32, packed_bits::Bits24>,
-        fractional_battery_voltage: u8,
-        descriptive_bit_field: DescriptiveBitField,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::BatteryStatus.to_primitive(),
-            _reserved: Default::default(),
-            battery_identifier,
-            cumulative_operating_time,
-            fractional_battery_voltage,
-            descriptive_bit_field,
-        }
-    }
 }
 
 #[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
@@ -570,11 +387,13 @@ pub struct Day {
     pub day_of_week: DayOfWeek,
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct TimeAndDate {
+    #[new(value = "DataPageNumbers::TimeAndDate.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1")]
     _reserved: ReservedOnes<packed_bits::Bits8>,
     #[packed_field(bytes = "2")]
@@ -591,27 +410,14 @@ pub struct TimeAndDate {
     pub year: u8,
 }
 
-impl TimeAndDate {
-    pub fn new(seconds: u8, minutes: u8, hours: u8, day: Day, month: u8, year: u8) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::TimeAndDate.to_primitive(),
-            _reserved: Default::default(),
-            seconds,
-            minutes,
-            hours,
-            day,
-            month,
-            year,
-        }
-    }
-}
-
 // TODO decide if subpage should be a enum
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct SubfieldData {
+    #[new(value = "DataPageNumbers::SubfieldData.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1")]
     _reserved: ReservedOnes<packed_bits::Bits8>,
     #[packed_field(bytes = "2")]
@@ -622,19 +428,6 @@ pub struct SubfieldData {
     pub data_field_1: u16,
     #[packed_field(bytes = "6:7")]
     pub data_field_2: u16,
-}
-
-impl SubfieldData {
-    pub fn new(subpage_1: u8, subpage_2: u8, data_field_1: u16, data_field_2: u16) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::SubfieldData.to_primitive(),
-            _reserved: Default::default(),
-            subpage_1,
-            subpage_2,
-            data_field_1,
-            data_field_2,
-        }
-    }
 }
 
 #[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
@@ -660,11 +453,13 @@ pub struct TotalSizeUnit {
     pub base_units: BaseUnits,
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct MemoryLevel {
+    #[new(value = "DataPageNumbers::MemoryLevel.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1:3")]
     _reserved: ReservedOnes<packed_bits::Bits24>,
     #[packed_field(bytes = "4")]
@@ -673,18 +468,6 @@ pub struct MemoryLevel {
     pub total_size: u16,
     #[packed_field(bytes = "7")]
     pub total_size_unit: TotalSizeUnit,
-}
-
-impl MemoryLevel {
-    pub fn new(percent_used: u8, total_size: u16, total_size_unit: TotalSizeUnit) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::MemoryLevel.to_primitive(),
-            _reserved: Default::default(),
-            percent_used,
-            total_size,
-            total_size_unit,
-        }
-    }
 }
 
 #[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
@@ -708,7 +491,7 @@ pub enum NetworkKey {
     AntFsKey = 3,
 }
 
-#[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct ChannelState {
     #[packed_field(bits = "7", ty = "enum")]
@@ -719,19 +502,10 @@ pub struct ChannelState {
     pub network_key: NetworkKey,
 }
 
-impl ChannelState {
-    pub fn new(paired: Paired, connection_state: ConnectionState, network_key: NetworkKey) -> Self {
-        Self {
-            paired,
-            connection_state,
-            network_key,
-        }
-    }
-}
-
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct PairedDevices {
+    #[new(value = "DataPageNumbers::PairedDevices.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
     #[packed_field(bytes = "1")]
@@ -748,42 +522,24 @@ pub struct PairedDevices {
     pub peripheral_device_id_device_type: DeviceType,
 }
 
-impl PairedDevices {
-    pub fn new(
-        peripheral_device_index: u8,
-        total_number_of_connected_devices: u8,
-        channel_state: ChannelState,
-        peripheral_device_id_device_number: u16,
-        peripheral_device_id_transmission_type: TransmissionType,
-        peripheral_device_id_device_type: DeviceType,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::PairedDevices.to_primitive(),
-            peripheral_device_index,
-            total_number_of_connected_devices,
-            channel_state,
-            peripheral_device_id_device_number,
-            peripheral_device_id_transmission_type,
-            peripheral_device_id_device_type,
-        }
-    }
-}
-
 #[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
 pub enum ErrorLevel {
     Warning = 1,
     Critical = 2,
 }
 
-#[derive(PackedStruct, DataPage, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct ErrorDescription {
+    #[new(value = "DataPageNumbers::ErrorDescription.to_primitive()")]
     #[packed_field(bytes = "0")]
     data_page_number: u8,
+    #[new(default)]
     #[packed_field(bytes = "1")]
     _reserved0: ReservedOnes<packed_bits::Bits8>,
     #[packed_field(bits = "16:19")]
     pub system_component_identifier: Integer<u8, packed_bits::Bits4>,
+    #[new(default)]
     #[packed_field(bits = "20:21")]
     _reserved1: ReservedZeroes<packed_bits::Bits2>,
     #[packed_field(bits = "22:23", ty = "enum")]
@@ -792,25 +548,6 @@ pub struct ErrorDescription {
     pub profile_specific_error_codes: u8,
     #[packed_field(bytes = "4:7")]
     pub manufacturer_specific_error_codes: u32,
-}
-
-impl ErrorDescription {
-    pub fn new(
-        system_component_identifier: Integer<u8, packed_bits::Bits4>,
-        error_level: ErrorLevel,
-        profile_specific_error_codes: u8,
-        manufacturer_specific_error_codes: u32,
-    ) -> Self {
-        Self {
-            data_page_number: DataPageNumbers::ErrorDescription.to_primitive(),
-            _reserved0: Default::default(),
-            system_component_identifier,
-            _reserved1: Default::default(),
-            error_level,
-            profile_specific_error_codes,
-            manufacturer_specific_error_codes,
-        }
-    }
 }
 
 #[cfg(test)]
