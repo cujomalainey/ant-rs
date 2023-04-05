@@ -10,14 +10,13 @@ use crate::messages::config::{TransmissionChannelType, TransmissionGlobalDataPag
 use crate::messages::data::{AcknowledgedData, BroadcastData};
 use crate::messages::{AntMessage, RxMessage, TxMessage};
 use crate::plus::common::datapages::{ModeSettings, RequestDataPage, MANUFACTURER_SPECIFIC_RANGE};
-use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
+use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment, MessageHandlerError};
 use crate::plus::profiles::heart_rate::{
     BatteryStatus, Capabilities, CumulativeOperatingTime, DataPageNumbers, DefaultDataPage,
     DeviceInformation, ManufacturerInformation, ManufacturerSpecific, PreviousHeartBeat,
     ProductInformation, SwimIntervalSummary, DATA_PAGE_NUMBER_MASK,
 };
-use crate::plus::{duration_to_search_timeout, NETWORK_RF_FREQUENCY};
-use crate::plus::{Channel, ChannelAssignment};
+use crate::plus::{duration_to_search_timeout, NETWORK_RF_FREQUENCY, Channel, ChannelAssignment};
 
 use packed_struct::{PackedStruct, PrimitiveEnum};
 
@@ -161,7 +160,7 @@ impl HeartRateDisplay {
         let data = match dp {
             TxDataPages::RequestDataPage(rd) => {
                 self.msg_handler
-                    .set_sending(AcknowledgedData::new(channel, rd.pack()?).into());
+                    .set_sending(AcknowledgedData::new(channel, rd.pack()?).into())?;
                 return Ok(());
             }
             TxDataPages::ModeSettings(ms) => ms.pack(),
@@ -169,10 +168,10 @@ impl HeartRateDisplay {
         }?;
         if use_ack {
             self.msg_handler
-                .set_sending(AcknowledgedData::new(channel, data).into());
+                .set_sending(AcknowledgedData::new(channel, data).into())?;
         } else {
             self.msg_handler
-                .set_sending(BroadcastData::new(channel, data).into());
+                .set_sending(BroadcastData::new(channel, data).into())?;
         }
         Ok(())
     }
@@ -206,10 +205,17 @@ pub enum HeartRateError {
     UnsupportedDataPage(u8),
     PageAlreadyPending(),
     NotAssociated(),
+    HandlerError(MessageHandlerError),
 }
 
 impl From<packed_struct::PackingError> for HeartRateError {
     fn from(err: packed_struct::PackingError) -> Self {
         Self::BytePatternError(err)
+    }
+}
+
+impl From<MessageHandlerError> for HeartRateError {
+    fn from(err: MessageHandlerError) -> Self {
+        Self::HandlerError(err)
     }
 }

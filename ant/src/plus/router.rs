@@ -54,7 +54,6 @@ type SharedChannel = Rc<RefCell<dyn Channel>>;
 pub struct Router<R, W, D: Driver<R, W>> {
     channels: [Option<SharedChannel>; MAX_CHANNELS],
     max_channels: Cell<usize>, // what the hardware reports as some have less than max
-    // TODO remove this refcell
     driver: RefCell<D>,
     reset_restore: Cell<bool>,
     rx_message_callback: Option<fn(&AntMessage)>,

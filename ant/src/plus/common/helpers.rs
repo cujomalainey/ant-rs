@@ -57,6 +57,11 @@ pub struct MessageHandler {
     profile_reference: &'static ProfileReference,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum MessageHandlerError {
+    TxBufferInUse,
+}
+
 impl MessageHandler {
     pub fn new(
         device_number: u16,
@@ -85,8 +90,12 @@ impl MessageHandler {
         self.pending_datapage.is_some()
     }
 
-    pub fn set_sending(&mut self, msg: TxMessage) {
+    pub fn set_sending(&mut self, msg: TxMessage) -> Result<(), MessageHandlerError>{
+        if self.pending_datapage.is_some() {
+            return Err(MessageHandlerError::TxBufferInUse);
+        }
         self.pending_datapage = Some(msg);
+        Ok(())
     }
 
     pub fn send_message(&mut self) -> Option<TxMessage> {
