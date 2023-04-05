@@ -13,7 +13,7 @@ use crate::messages::config::{
     SearchTimeout, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
 };
 use crate::messages::control::{CloseChannel, OpenChannel};
-use crate::messages::requested_response::ChannelStatus;
+use crate::messages::requested_response::{ChannelState, ChannelStatus};
 use crate::messages::{AntMessage, RxMessage, TxMessage};
 use packed_struct::prelude::{packed_bits, Integer};
 
@@ -185,26 +185,42 @@ impl MessageHandler {
         }
     }
 
+    // TODO add logic to request this on setup
     fn handle_status(&mut self, msg: &ChannelStatus) {
         match msg.channel_state {
-            _ => (),
+            ChannelState::UnAssigned => self.reset_state(),
+            ChannelState::Assigned | ChannelState::Searching | ChannelState::Tracking => {
+                self.clean_radio_state()
+            }
         }
     }
 
     fn handle_response(&mut self, msg: &ChannelResponse) {
         match msg.message_code {
+            MessageCode::ResponseNoError => self.advance_state_machine(true),
+            MessageCode::ChannelInWrongState
+            | MessageCode::ChannelNotOpened
+            | MessageCode::ChannelIdNotSet => self.reset_state(),
+            MessageCode::InvalidMessage
+            | MessageCode::InvalidNetworkNumber
+            | MessageCode::InvalidListId
+            | MessageCode::InvalidScanTxChannel
+            | MessageCode::InvalidParameterProvided
+            | MessageCode::MesgSerialErrorId => self.advance_state_machine(false),
             _ => (),
         }
     }
 
     fn handle_event(&mut self, msg: &ChannelEvent) {
         match msg.payload.message_code {
+            // TODO update out state
             MessageCode::EventChannelClosed => (),
             MessageCode::EventRxFailGoToSearch => (),
             _ => (),
         }
     }
 
+    // Request this on connect
     fn handle_id(&mut self, msg: &ChannelId) {
         self.device_number = msg.device_number;
         // TODO copy rest of state
@@ -221,5 +237,17 @@ impl MessageHandler {
     pub fn set_channel(&mut self, channel: ChannelAssignment) {
         self.channel = channel;
         self.configure_state = ConfigureState::Assign;
+    }
+
+    fn reset_state(&mut self) {
+        todo!()
+    }
+
+    fn advance_state_machine(&mut self, _success: bool) {
+        todo!()
+    }
+
+    fn clean_radio_state(&mut self) {
+        todo!()
     }
 }
