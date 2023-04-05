@@ -46,6 +46,9 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core as std;
 
+pub mod channel;
 pub mod drivers;
 pub mod messages;
 pub mod plus;
+#[cfg(feature = "alloc")]
+pub mod router;

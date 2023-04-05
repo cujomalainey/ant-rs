@@ -6,6 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::channel::ChannelAssignment;
 use crate::messages::channel::{ChannelEvent, ChannelResponse, MessageCode};
 use crate::messages::config::{
     AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
@@ -14,7 +15,6 @@ use crate::messages::config::{
 use crate::messages::control::{CloseChannel, OpenChannel};
 use crate::messages::requested_response::ChannelStatus;
 use crate::messages::{AntMessage, RxMessage, TxMessage};
-use crate::plus::ChannelAssignment;
 use packed_struct::prelude::{packed_bits, Integer};
 
 enum ConfigureState {
@@ -90,7 +90,7 @@ impl MessageHandler {
         self.pending_datapage.is_some()
     }
 
-    pub fn set_sending(&mut self, msg: TxMessage) -> Result<(), MessageHandlerError>{
+    pub fn set_sending(&mut self, msg: TxMessage) -> Result<(), MessageHandlerError> {
         if self.pending_datapage.is_some() {
             return Err(MessageHandlerError::TxBufferInUse);
         }

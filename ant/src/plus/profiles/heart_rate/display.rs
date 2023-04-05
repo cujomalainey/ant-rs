@@ -6,17 +6,20 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
 use crate::messages::config::{TransmissionChannelType, TransmissionGlobalDataPages};
 use crate::messages::data::{AcknowledgedData, BroadcastData};
 use crate::messages::{AntMessage, RxMessage, TxMessage};
 use crate::plus::common::datapages::{ModeSettings, RequestDataPage, MANUFACTURER_SPECIFIC_RANGE};
-use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment, MessageHandlerError};
+use crate::plus::common::helpers::{
+    MessageHandler, MessageHandlerError, ProfileReference, TransmissionTypeAssignment,
+};
 use crate::plus::profiles::heart_rate::{
     BatteryStatus, Capabilities, CumulativeOperatingTime, DataPageNumbers, DefaultDataPage,
     DeviceInformation, ManufacturerInformation, ManufacturerSpecific, PreviousHeartBeat,
     ProductInformation, SwimIntervalSummary, DATA_PAGE_NUMBER_MASK,
 };
-use crate::plus::{duration_to_search_timeout, NETWORK_RF_FREQUENCY, Channel, ChannelAssignment};
+use crate::plus::NETWORK_RF_FREQUENCY;
 
 use packed_struct::{PackedStruct, PrimitiveEnum};
 

@@ -9,7 +9,7 @@
 use ant::drivers::{is_ant_usb_device_from_device, SerialDriver, StubPin, UsbSerial};
 use ant::messages::config::SetNetworkKey;
 use ant::plus::profiles::heart_rate::HeartRateDisplay;
-use ant::plus::router::Router;
+use ant::router::Router;
 use dialoguer::Select;
 use rusb::{Device, DeviceList};
 

@@ -6,11 +6,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::channel::{Channel, ChannelAssignment};
+use crate::drivers::{Driver, DriverError};
 use crate::messages::config::UnAssignChannel;
 use crate::messages::control::{CloseChannel, RequestMessage, RequestableMessageId, ResetSystem};
 use crate::messages::requested_response::Capabilities;
 use crate::messages::{AntMessage, RxMessage, TransmitableMessage};
-use crate::channel::{Channel, ChannelAssignment};
 
 use std::cell::{Cell, RefCell};
 use std::marker::PhantomData;
@@ -22,26 +23,12 @@ use std::rc::Rc;
 
 #[derive(Debug)]
 pub enum RouterError {
-    ChannelError(ChannelError),
     OutOfChannels(),
-    OutOfNetworks(),
-    /// This means that we have not recieved the capabilities yet for the hardware. Usually this
-    /// means you haven't called process yet or you have a communication problem with your device.
-    DeviceCapabilitiesUnknown(),
     ChannelAlreadyAssigned(),
     DriverError(),
     ChannelOutOfBounds(),
     ChannelNotAssociated(),
-    NetworkIndexInUse(),
     FailedToGetCapabilities(),
-}
-
-/// Channel Errors specific to router interfacing
-#[derive(Debug)]
-pub enum ChannelError {
-    AlreadyAssociated(),
-    IOErrorOnRestore(),
-    NetworkKeyNotSet(),
 }
 
 // This in theory is infinite, but its what the current hardware limit is.
@@ -64,12 +51,6 @@ impl<R, W> From<DriverError<R, W>> for RouterError {
     fn from(_err: DriverError<R, W>) -> Self {
         // TODO encapsilate error
         RouterError::DriverError()
-    }
-}
-
-impl From<ChannelError> for RouterError {
-    fn from(err: ChannelError) -> Self {
-        RouterError::ChannelError(err)
     }
 }
 
