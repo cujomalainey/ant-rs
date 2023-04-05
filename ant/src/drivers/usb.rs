@@ -14,6 +14,7 @@ use rusb::{Device, DeviceHandle, Direction, Interface, TransferType, UsbContext}
 use std::cmp::min;
 use std::time::Duration;
 
+// TODO turn this into its own driver reusing common funcs and drop serial
 pub struct UsbSerial<T: UsbContext> {
     handle: DeviceHandle<T>,
     in_address: u8,
