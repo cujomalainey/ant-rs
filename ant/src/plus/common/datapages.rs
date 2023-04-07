@@ -229,7 +229,7 @@ pub struct ComponentIdentifier {
     pub component_identifier: Integer<u8, packed_bits::Bits4>,
 }
 
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "5")]
 pub struct CommonManufacturersInformation {
     #[packed_field(bytes = "0")]
@@ -255,7 +255,7 @@ pub struct MultiComponentSystemManufacturersInformation {
     pub commmon_manufacturers_information: CommonManufacturersInformation,
 }
 
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "6")]
 pub struct CommonProductInformation {
     #[packed_field(bytes = "0")]
@@ -378,7 +378,7 @@ pub enum DayOfWeek {
 }
 
 // TODO try and move this into the struct directly
-#[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct Day {
     #[packed_field(bits = "0:4")]
@@ -601,73 +601,60 @@ mod tests {
 
     #[test]
     fn manufacturers_information() {
-        let unpacked =
-            ManufacturersInformation::unpack(&[0x50, 0xFF, 0xFF, 0x0A, 0x02, 0x00, 0x24, 0x01])
-                .unwrap();
-        assert_eq!(unpacked.commmon_manufacturers_information.hw_revision, 10);
-        assert_eq!(
-            unpacked.commmon_manufacturers_information.manufacturer_id,
-            2
-        );
-        assert_eq!(unpacked.commmon_manufacturers_information.model_number, 292);
+        let packed = ManufacturersInformation::new(CommonManufacturersInformation::new(10, 2, 292))
+            .pack()
+            .unwrap();
+        assert_eq!(packed, [0x50, 0xFF, 0xFF, 0x0A, 0x02, 0x00, 0x24, 0x01]);
     }
 
     #[test]
     fn product_information() {
-        let unpacked =
-            ProductInformation::unpack(&[0x51, 0xFF, 0x50, 0x0D, 0x02, 0x00, 0x24, 0x01]).unwrap();
+        let packed = ProductInformation::new(CommonProductInformation::new(80, 13, 19136514))
+            .pack()
+            .unwrap();
 
-        assert_eq!(
-            unpacked.common_product_information.sw_revision_supplemental,
-            80
-        );
-        assert_eq!(unpacked.common_product_information.sw_revision_main, 13);
-        assert_eq!(unpacked.common_product_information.serial_number, 19136514);
+        assert_eq!(packed, [0x51, 0xFF, 0x50, 0x0D, 0x02, 0x00, 0x24, 0x01]);
     }
 
     #[test]
     fn battery_status() {
-        let unpacked =
-            BatteryStatus::unpack(&[0x52, 0xFF, 0xA1, 0x1A, 0x2C, 0x03, 0x8B, 0x32]).unwrap();
+        let packed = BatteryStatus::new(
+            BatteryIdentifier::new(0x1.into(), 0xA.into()),
+            0x32C1A.into(),
+            0x8B,
+            DescriptiveBitField::new(
+                2.into(),
+                BatteryStatusField::OK,
+                OperatingTimeResolution::SixteenSecondResolution,
+            ),
+        )
+        .pack()
+        .unwrap();
 
-        assert_eq!(
-            unpacked.descriptive_bit_field,
-            DescriptiveBitField {
-                coarse_battery_voltage: 2.into(),
-                battery_status: BatteryStatusField::OK,
-                operating_time_resolution: OperatingTimeResolution::SixteenSecondResolution
-            }
-        );
-        assert_eq!(unpacked.cumulative_operating_time, 0x32C1A.into());
-        assert_eq!(unpacked.fractional_battery_voltage, 0x8B);
-        // TODO check below against SimulANT
-        assert_eq!(unpacked.battery_identifier.identifier, 0xA.into());
-        assert_eq!(unpacked.battery_identifier.number_of_batteries, 0x1.into());
+        assert_eq!(packed, [0x52, 0xFF, 0xA1, 0x1A, 0x2C, 0x03, 0x8B, 0x32]);
     }
 
     #[test]
     fn time_and_date() {
-        let unpacked =
-            TimeAndDate::unpack(&[0x53, 0xFF, 0x0D, 0x1B, 0x11, 0x92, 0x06, 0x09]).unwrap();
+        let packed = TimeAndDate::new(
+            13,
+            27,
+            17.into(),
+            Day::new(18.into(), DayOfWeek::Thursday),
+            6,
+            09,
+        )
+        .pack()
+        .unwrap();
 
-        assert_eq!(unpacked.seconds, 13);
-        assert_eq!(unpacked.minutes, 27);
-        assert_eq!(unpacked.hours, 17);
-        assert_eq!(unpacked.day.day_of_week, DayOfWeek::Thursday);
-        assert_eq!(unpacked.day.day, 18.into());
-        assert_eq!(unpacked.month, 6);
-        assert_eq!(unpacked.year, 09);
+        assert_eq!(packed, [0x53, 0xFF, 0x0D, 0x1B, 0x11, 0x92, 0x06, 0x09]);
     }
 
     #[test]
     fn subfield_data() {
-        let unpacked =
-            SubfieldData::unpack(&[0x54, 0xFF, 0x01, 0x03, 0x6B, 0x0A, 0xEA, 0x19]).unwrap();
+        let packed = SubfieldData::new(1, 3, 2667, 6634).pack().unwrap();
 
-        assert_eq!(unpacked.subpage_1, 1);
-        assert_eq!(unpacked.subpage_2, 3);
-        assert_eq!(unpacked.data_field_1 as i16, 2667);
-        assert_eq!(unpacked.data_field_2, 6634);
+        assert_eq!(packed, [0x54, 0xFF, 0x01, 0x03, 0x6B, 0x0A, 0xEA, 0x19]);
     }
 
     #[test]

@@ -376,36 +376,18 @@ mod tests {
         assert_eq!(packed, [5, 0xCC, 0xAA, 0xBB, 0x00, 0xE0, 0x0D, 0x00]);
     }
 
-    // TODO invert tests to check bytes so reserved fields are checked
     #[test]
     fn capabilities() {
-        let unpacked =
-            Capabilities::unpack(&[0x06, 0xFF, 0xC6, 0x82, 0x00, 0x00, 0x20, 0x00]).unwrap();
+        let packed = Capabilities::new(
+            false,
+            Features::new(false, true, true, false, true, true),
+            Features::new(false, true, false, false, false, true),
+            CommonData::new(0xE000, 0x0D, 0),
+        )
+        .pack()
+        .unwrap();
 
-        assert_eq!(unpacked.features_supported.extended_running_features, false);
-        assert_eq!(unpacked.features_supported.extended_cycling_features, true);
-        assert_eq!(unpacked.features_supported.extended_swimming_features, true);
-        assert_eq!(unpacked.features_supported.gym_mode, false);
-        assert_eq!(
-            unpacked.features_supported.manufacturer_specific_feature_0,
-            true
-        );
-        assert_eq!(
-            unpacked.features_supported.manufacturer_specific_feature_1,
-            true
-        );
-        assert_eq!(unpacked.features_enabled.extended_running_features, false);
-        assert_eq!(unpacked.features_enabled.extended_cycling_features, true);
-        assert_eq!(unpacked.features_enabled.extended_swimming_features, false);
-        assert_eq!(unpacked.features_enabled.gym_mode, false);
-        assert_eq!(
-            unpacked.features_enabled.manufacturer_specific_feature_0,
-            false
-        );
-        assert_eq!(
-            unpacked.features_enabled.manufacturer_specific_feature_1,
-            true
-        );
+        assert_eq!(packed, [0x06, 0xFF, 0xC6, 0x82, 0x00, 0xE0, 0x0D, 0x00]);
     }
 
     #[test]
@@ -428,7 +410,7 @@ mod tests {
         let pack = DeviceInformation::new(
             true,
             HeartbeatEventType::ComputedTimestamp,
-            CommonData::new(0xFFAA, 242, 93)
+            CommonData::new(0xFFAA, 242, 93),
         )
         .pack()
         .unwrap();
@@ -438,15 +420,22 @@ mod tests {
     #[test]
     fn hr_feature_command() {
         let packed = HRFeatureCommand::new(ApplyField::new(true), FeatureField::new(false))
-        .pack()
-        .unwrap();
+            .pack()
+            .unwrap();
 
         assert_eq!(packed, [32, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00]);
     }
 
     #[test]
     fn manufacter_specific() {
-        let pack = ManufacturerSpecific::new(114.into(), false, [0xAA, 0xFF, 0xCC], CommonData::new(0xFFAA, 242, 93)) .pack() .unwrap();
+        let pack = ManufacturerSpecific::new(
+            114.into(),
+            false,
+            [0xAA, 0xFF, 0xCC],
+            CommonData::new(0xFFAA, 242, 93),
+        )
+        .pack()
+        .unwrap();
         assert_eq!([114, 0xAA, 0xFF, 0xCC, 0xAA, 0xFF, 242, 93], pack);
     }
 }
