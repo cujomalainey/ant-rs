@@ -377,16 +377,6 @@ pub enum DayOfWeek {
     Invalid = 7,
 }
 
-// TODO try and move this into the struct directly
-#[derive(PackedStruct, new, Copy, Clone, Debug, PartialEq)]
-#[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
-pub struct Day {
-    #[packed_field(bits = "0:4")]
-    pub day: Integer<u8, packed_bits::Bits5>,
-    #[packed_field(bits = "5:7", ty = "enum")]
-    pub day_of_week: DayOfWeek,
-}
-
 #[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct TimeAndDate {
@@ -402,8 +392,10 @@ pub struct TimeAndDate {
     pub minutes: u8,
     #[packed_field(bytes = "4")]
     pub hours: u8,
-    #[packed_field(bytes = "5")]
-    pub day: Day,
+    #[packed_field(bits = "43:47")]
+    pub day: Integer<u8, packed_bits::Bits5>,
+    #[packed_field(bits = "40:42", ty = "enum")]
+    pub day_of_week: DayOfWeek,
     #[packed_field(bytes = "6")]
     pub month: u8,
     #[packed_field(bytes = "7")]
@@ -652,7 +644,8 @@ mod tests {
             13,
             27,
             17.into(),
-            Day::new(18.into(), DayOfWeek::Thursday),
+            18.into(),
+            DayOfWeek::Thursday,
             6,
             09,
         )
