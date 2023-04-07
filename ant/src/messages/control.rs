@@ -63,7 +63,6 @@ pub struct NvmeRequest {
     pub size: u8,
 }
 
-// TODO test
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RequestMessage {
     pub data: RequestMessageData,
@@ -143,6 +142,14 @@ mod tests {
     fn close_channel() {
         let packed = CloseChannel::new(0);
         assert_eq!(packed.pack().unwrap(), [0]);
+    }
+
+    #[test]
+    fn request_message() {
+        let mut buf = [0; 5];
+        let packed = RequestMessage::new(3, RequestableMessageId::AntVersion, None);
+        assert_eq!(packed.serialize_message(&mut buf).unwrap(), 2);
+        assert_eq!(buf, [3, 0x3E, 0, 0, 0]);
     }
 
     #[test]
