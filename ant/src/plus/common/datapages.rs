@@ -410,8 +410,20 @@ pub struct TimeAndDate {
     pub year: u8,
 }
 
-// TODO decide if subpage should be a enum
-#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
+pub enum Subpage {
+    Temperature = 1,
+    BarometricPressure = 2,
+    Humidity = 3,
+    WindSpeed = 4,
+    WindDirection = 5,
+    ChargingCycles = 6,
+    MinimumOperatingTemperature = 7,
+    MaximumOperatingTemperature = 8,
+    Invalid = 255,
+}
+
+#[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct SubfieldData {
     #[new(value = "DataPageNumbers::SubfieldData.to_primitive()")]
@@ -420,10 +432,10 @@ pub struct SubfieldData {
     #[new(default)]
     #[packed_field(bytes = "1")]
     _reserved: ReservedOnes<packed_bits::Bits8>,
-    #[packed_field(bytes = "2")]
-    pub subpage_1: u8,
-    #[packed_field(bytes = "3")]
-    pub subpage_2: u8,
+    #[packed_field(bytes = "2", ty = "enum")]
+    pub subpage_1: Subpage,
+    #[packed_field(bytes = "3", ty = "enum")]
+    pub subpage_2: Subpage,
     #[packed_field(bytes = "4:5")]
     pub data_field_1: u16,
     #[packed_field(bytes = "6:7")]
@@ -652,7 +664,9 @@ mod tests {
 
     #[test]
     fn subfield_data() {
-        let packed = SubfieldData::new(1, 3, 2667, 6634).pack().unwrap();
+        let packed = SubfieldData::new(Subpage::Temperature, Subpage::Humidity, 2667, 6634)
+            .pack()
+            .unwrap();
 
         assert_eq!(packed, [0x54, 0xFF, 0x01, 0x03, 0x6B, 0x0A, 0xEA, 0x19]);
     }
