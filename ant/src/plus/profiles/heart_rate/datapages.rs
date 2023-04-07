@@ -119,6 +119,9 @@ pub struct ProductInformation {
     pub common: CommonData,
 }
 
+/// Value for unused [PreviousHeartBeat::manufacturer_specific]
+pub const PREVIOUS_HEART_BEAT_MANUFACTURER_SPECIFIC_UNUSED: u8 = 0xFF;
+
 /// This struct represents datapage 4 in the heart rate profile.
 #[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
@@ -128,6 +131,7 @@ pub struct PreviousHeartBeat {
     data_page_number: Integer<u8, packed_bits::Bits7>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
+    /// Set to [PREVIOUS_HEART_BEAT_MANUFACTURER_SPECIFIC_UNUSED] if you do not use this field
     #[packed_field(bytes = "1")]
     pub manufacturer_specific: u8,
     #[packed_field(bytes = "2:3")]
