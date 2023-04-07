@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::messages::config::{DeviceType, TransmissionType};
+pub use crate::messages::config::{DeviceType, TransmissionType};
 use ant_derive::DataPage;
 use derive_new::new;
 use packed_struct::prelude::*;
@@ -67,7 +67,7 @@ pub struct AntFsHostCommandResponse {
 }
 
 // TODO add custom functions to set transmit until acked
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct RequestedTransmissionResponse {
     #[packed_field(bits = "0:6")]
@@ -570,12 +570,32 @@ mod tests {
 
     #[test]
     fn request_data_page() {
-        // TODO
+        let packed = RequestDataPage::new(
+            0xFFEE,
+            0x88,
+            0xEE,
+            RequestedTransmissionResponse::new(10.into(), true),
+            0x55,
+            CommandType::RequestDataPage,
+        )
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [0x46, 0xEE, 0xFF, 0x88, 0xEE, 0x8A, 0x55, 0x01]);
     }
 
     #[test]
     fn command_status() {
-        // TODO
+        let packed = CommandStatus::new(
+            0xAB,
+            0x12,
+            CommandStatusValue::NotSupported,
+            [0x55, 0x44, 0x33, 0x22],
+        )
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [0x47, 0xAB, 0x12, 0x02, 0x55, 0x44, 0x33, 0x22]);
     }
 
     #[test]
@@ -608,6 +628,7 @@ mod tests {
         let packed = ManufacturersInformation::new(CommonManufacturersInformation::new(10, 2, 292))
             .pack()
             .unwrap();
+
         assert_eq!(packed, [0x50, 0xFF, 0xFF, 0x0A, 0x02, 0x00, 0x24, 0x01]);
     }
 
@@ -640,17 +661,9 @@ mod tests {
 
     #[test]
     fn time_and_date() {
-        let packed = TimeAndDate::new(
-            13,
-            27,
-            17.into(),
-            18.into(),
-            DayOfWeek::Thursday,
-            6,
-            09,
-        )
-        .pack()
-        .unwrap();
+        let packed = TimeAndDate::new(13, 27, 17.into(), 18.into(), DayOfWeek::Thursday, 6, 09)
+            .pack()
+            .unwrap();
 
         assert_eq!(packed, [0x53, 0xFF, 0x0D, 0x1B, 0x11, 0x92, 0x06, 0x09]);
     }
