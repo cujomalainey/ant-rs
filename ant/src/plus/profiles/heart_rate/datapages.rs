@@ -11,9 +11,7 @@ use ant_derive::DataPage;
 use derive_new::new;
 use packed_struct::prelude::*;
 
-// TODO TEST THIS FILE
 // TODO add is_valid checks to fields
-// TODO hard code datapage values
 // TODO add invalid defaults
 
 pub const DATA_PAGE_NUMBER_MASK: u8 = 0x7F;
@@ -32,10 +30,9 @@ pub enum DataPageNumbers {
     HRFeatureCommand = 32,
 }
 
-// TODO is this doing anything?
 impl From<DataPageNumbers> for Integer<u8, packed_bits::Bits7> {
     fn from(dp: DataPageNumbers) -> Self {
-        (dp as u8).into()
+        dp.to_primitive().into()
     }
 }
 
