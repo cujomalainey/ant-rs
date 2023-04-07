@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::plus::common::datapages::BatteryStatusField;
+pub use crate::plus::common::datapages::BatteryStatusField;
 use ant_derive::DataPage;
 use derive_new::new;
 use packed_struct::prelude::*;
@@ -259,18 +259,20 @@ pub struct DeviceInformation {
     pub common: CommonData,
 }
 
-#[derive(PackedStruct, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "1")]
 pub struct ApplyField {
+    #[new(default)]
     #[packed_field(bits = "0:6")]
     _reserved: ReservedOnes<packed_bits::Bits7>,
     #[packed_field(bits = "7")]
     pub gym_mode: bool,
 }
 
-#[derive(PackedStruct, PartialEq, Copy, Clone, Debug)]
+#[derive(PackedStruct, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "1")]
 pub struct FeatureField {
+    #[new(default)]
     #[packed_field(bits = "0:6")]
     _reserved: ReservedZeroes<packed_bits::Bits7>,
     #[packed_field(bits = "7")]
@@ -279,7 +281,7 @@ pub struct FeatureField {
 
 /// This struct represents datapage 32 in the heart rate profile.
 #[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
-#[packed_struct(bit_numbering = "lsb0", size_bytes = "8")]
+#[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct HRFeatureCommand {
     #[new(value = "DataPageNumbers::HRFeatureCommand.to_primitive()")]
     #[packed_field(bytes = "0")]
@@ -296,7 +298,7 @@ pub struct HRFeatureCommand {
 /// This struct represents datapage 112-127 in the heart rate profile.
 /// The data section is open to interpretation by the implementer
 #[derive(PackedStruct, DataPage, new, PartialEq, Copy, Clone, Debug)]
-#[packed_struct(bit_numbering = "lsb0", size_bytes = "8")]
+#[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct ManufacturerSpecific {
     #[packed_field(bits = "1:7")]
     data_page_number: Integer<u8, packed_bits::Bits7>,
@@ -308,7 +310,6 @@ pub struct ManufacturerSpecific {
     pub common: CommonData,
 }
 
-// TODO invert tests to check bytes so reserved fields are checked
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -329,7 +330,11 @@ mod tests {
 
     #[test]
     fn cumulative_operating_time() {
-        // TODO
+        let packed =
+            CumulativeOperatingTime::new(false, 0xAABBCC.into(), CommonData::new(0x1122, 3, 4))
+                .pack()
+                .unwrap();
+        assert_eq!(packed, [1, 0xCC, 0xBB, 0xAA, 0x22, 0x11, 3, 4]);
     }
 
     #[test]
@@ -352,14 +357,29 @@ mod tests {
 
     #[test]
     fn previous_heart_beat() {
-        // TODO
+        let packed = PreviousHeartBeat::new(
+            false,
+            PREVIOUS_HEART_BEAT_MANUFACTURER_SPECIFIC_UNUSED,
+            0xAABB,
+            CommonData::new(0xE000, 0x0D, 0),
+        )
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [4, 0xFF, 0xBB, 0xAA, 0x00, 0xE0, 0x0D, 0x00]);
     }
 
     #[test]
     fn swim_interval_summary() {
-        // TODO
+        let packed =
+            SwimIntervalSummary::new(false, 0xCC, 0xAA, 0xBB, CommonData::new(0xE000, 0x0D, 0))
+                .pack()
+                .unwrap();
+
+        assert_eq!(packed, [5, 0xCC, 0xAA, 0xBB, 0x00, 0xE0, 0x0D, 0x00]);
     }
 
+    // TODO invert tests to check bytes so reserved fields are checked
     #[test]
     fn capabilities() {
         let unpacked =
@@ -393,7 +413,17 @@ mod tests {
 
     #[test]
     fn battery_status() {
-        // TODO
+        let packed = BatteryStatus::new(
+            false,
+            0x0F,
+            0xAA,
+            DescriptiveBitField::new(0xF.into(), BatteryStatusField::Invalid),
+            CommonData::new(0xE000, 0x0D, 0),
+        )
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [7, 0x0F, 0xAA, 0x7F, 0x00, 0xE0, 0x0D, 0x00]);
     }
 
     #[test]
@@ -401,20 +431,25 @@ mod tests {
         let pack = DeviceInformation::new(
             true,
             HeartbeatEventType::ComputedTimestamp,
-            CommonData::new(111 << 8 | 183, 242, 93),
+            CommonData::new(0xFFAA, 242, 93)
         )
         .pack()
         .unwrap();
-        assert_eq!([137, 253, 255, 255, 183, 111, 242, 93], pack);
+        assert_eq!([137, 253, 255, 255, 0xAA, 0xFF, 242, 93], pack);
     }
 
     #[test]
     fn hr_feature_command() {
-        // TODO
+        let packed = HRFeatureCommand::new(ApplyField::new(true), FeatureField::new(false))
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [32, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00]);
     }
 
     #[test]
     fn manufacter_specific() {
-        // TODO
+        let pack = ManufacturerSpecific::new(114.into(), false, [0xAA, 0xFF, 0xCC], CommonData::new(0xFFAA, 242, 93)) .pack() .unwrap();
+        assert_eq!([114, 0xAA, 0xFF, 0xCC, 0xAA, 0xFF, 242, 93], pack);
     }
 }
