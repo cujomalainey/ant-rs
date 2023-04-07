@@ -89,8 +89,7 @@ AntAutoPackWithExtention!(
 );
 
 impl AssignChannel {
-    // TODO change wording to match macro
-    /// Creates a new Assign Channel message
+    /// Constructs a new `AssignChannel`.
     pub fn new(
         channel_number: u8,
         channel_type: ChannelType,
@@ -142,12 +141,14 @@ pub struct TransmissionType {
 }
 
 impl TransmissionType {
+    /// Modifies the type into a wildcarded value.
     pub fn wildcard(&mut self) {
         self.transmission_channel_type = TransmissionChannelType::Reserved;
         self.global_datapages_used = TransmissionGlobalDataPages::GlobalDataPagesNotUsed;
         self.device_number_extension = 0.into();
     }
 
+    /// Constructs a new `TransmissionType` with wildcarded values.
     pub fn new_wildcard() -> Self {
         Self {
             transmission_channel_type: TransmissionChannelType::Reserved,
@@ -168,11 +169,13 @@ pub struct DeviceType {
 }
 
 impl DeviceType {
+    /// Modifies the type into a wildcarded value.
     pub fn wildcard(&mut self) {
         self.pairing_request = false;
         self.device_type_id = 0.into();
     }
 
+    /// Constructs a new `DeviceType` with wildcarded values.
     pub fn new_wildcard() -> Self {
         Self {
             pairing_request: false,
@@ -218,10 +221,10 @@ impl ChannelId {
         self.transmission_type.wildcard();
     }
 
-    /// Make a new ChannelId message with wildcard values
-    pub fn new_wildcard() -> Self {
+    /// Constructs a new `ChannelId` with wildcarded values.
+    pub fn new_wildcard(channel: u8) -> Self {
         Self {
-            channel_number: 0,
+            channel_number: channel,
             device_number: 0,
             device_type: DeviceType::new_wildcard(),
             transmission_type: TransmissionType::new_wildcard(),
@@ -644,7 +647,7 @@ AntAutoPackWithExtention!(
 );
 
 impl HighDutySearch {
-    /// Creates a new High Duty Search message
+    /// Constructs a new `HighDutySearch`.
     pub fn new(enable: bool, suppression_cycle: Option<HighDutySearchSuppressionCycle>) -> Self {
         Self {
             data: HighDutySearchData {
@@ -739,7 +742,7 @@ impl TransmitableMessage for ConfigureAdvancedBurst {
 }
 
 impl ConfigureAdvancedBurst {
-    /// Creates a new Configure Advanced Burst message
+    /// Constructs a new `ConfigureAdvancedBurst`.
     pub fn new(
         enable: bool,
         max_packet_length: AdvancedBurstMaxPacketLength,

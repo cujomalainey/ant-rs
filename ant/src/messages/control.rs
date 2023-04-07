@@ -76,6 +76,7 @@ AntAutoPackWithExtention!(
 );
 
 impl RequestMessage {
+    /// Constructs a new `RequestMessage`.
     pub fn new(
         channel: u8,
         message_id: RequestableMessageId,

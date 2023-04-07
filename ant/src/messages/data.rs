@@ -253,6 +253,7 @@ impl From<BroadcastData> for TxMessage {
 const BROADCAST_PAYLOAD_SIZE: usize = 9;
 
 impl BroadcastData {
+    /// Constructs a new `BroadcastData`.
     pub fn new(channel_number: u8, data: [u8; 8]) -> Self {
         Self {
             payload: BroadcastDataPayload {
@@ -300,6 +301,7 @@ impl From<AcknowledgedData> for TxMessage {
 }
 
 impl AcknowledgedData {
+    /// Constructs a new `AcknowledgedData`.
     pub fn new(channel_number: u8, data: [u8; 8]) -> Self {
         Self {
             payload: BroadcastDataPayload {
@@ -364,6 +366,7 @@ impl From<BurstTransferData> for TxMessage {
 const BURSTTRANSFER_PAYLOAD_SIZE: usize = 9;
 
 impl BurstTransferData {
+    /// Constructs a new `BurstTransferData`.
     pub fn new(channel_sequence: ChannelSequence, data: [u8; 8]) -> Self {
         Self {
             payload: BurstTransferDataPayload {
@@ -391,6 +394,7 @@ pub struct AdvancedBurstData {
 }
 
 impl AdvancedBurstData {
+    /// Constructs a new `AdvancedBurstData`.
     pub fn new(
         channel_sequence: ChannelSequence,
         data: ArrayVec<u8, ADVANCED_BURST_BUFFER_SIZE>,
