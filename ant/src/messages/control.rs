@@ -92,10 +92,28 @@ impl RequestMessage {
     }
 }
 
-// TODO implement serialize and test
-// TODO implement new handler
+#[derive(new, Clone, Copy, Debug, Default, PartialEq)]
 pub struct OpenRxScanMode {
     pub synchronous_channel_packets_only: Option<bool>,
+}
+
+impl TransmitableMessage for OpenRxScanMode {
+    fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
+        let len = if self.synchronous_channel_packets_only.is_some() {
+            2
+        } else {
+            1
+        };
+        buf[0] = 0;
+        if let Some(sync_packets) = self.synchronous_channel_packets_only {
+            buf[1] = if sync_packets { 1 } else { 0 };
+        }
+        Ok(len)
+    }
+
+    fn get_tx_msg_id(&self) -> TxMessageId {
+        TxMessageId::OpenRxScanMode
+    }
 }
 
 #[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
@@ -125,6 +143,21 @@ mod tests {
     fn close_channel() {
         let packed = CloseChannel::new(0);
         assert_eq!(packed.pack().unwrap(), [0]);
+    }
+
+    #[test]
+    fn open_rx_scan_mode() {
+        let mut buf = [0; 2];
+
+        let packed = OpenRxScanMode::new(Some(true));
+        assert_eq!(packed.serialize_message(&mut buf).unwrap(), 2);
+        assert_eq!(buf, [0, 1]);
+
+        buf = [0, 0];
+
+        let packed = OpenRxScanMode::new(None);
+        assert_eq!(packed.serialize_message(&mut buf).unwrap(), 1);
+        assert_eq!(buf, [0, 0]);
     }
 
     #[test]
