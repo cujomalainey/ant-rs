@@ -361,7 +361,6 @@ impl EncryptionModeParameters {
         }
         let parameter = RequestedEncryptionParameter::from_primitive(data[0])
             .ok_or(PackingError::InvalidValue)?;
-        // TODO magic num
         let data = &data[1..];
         let data = match parameter {
             RequestedEncryptionParameter::MaxSupportedEncryptionMode => {

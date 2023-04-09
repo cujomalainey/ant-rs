@@ -1289,7 +1289,6 @@ mod tests {
         let size = packed.serialize_message(&mut buf[..]).unwrap();
         assert_eq!(buf[..size], [0, 1, 0x03, 0, 0, 0, 1, 0, 0]);
         // TODO test optional fields
-        // TODO test RX
     }
 
     #[test]

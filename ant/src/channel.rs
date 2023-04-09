@@ -14,7 +14,6 @@ pub const fn duration_to_search_timeout(t: Duration) -> u8 {
     ((t.as_secs() * 10) / (25)) as u8
 }
 
-// TODO move the below two types to a generic location
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ChannelAssignment {
     Assigned(u8),
