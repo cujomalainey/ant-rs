@@ -29,8 +29,6 @@ pub(crate) const ADVANCED_BURST_BUFFER_SIZE: usize = min(
     254,
 );
 
-const CHANNEL_ID_OUTPUT_SIZE: usize = 4;
-
 #[derive(PackedStruct, Clone, Copy, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "4")]
 pub struct ChannelIdOutput {
@@ -40,6 +38,10 @@ pub struct ChannelIdOutput {
     pub device_type: DeviceType,
     #[packed_field(bytes = "3")]
     pub transmission_type: TransmissionType,
+}
+
+impl ChannelIdOutput {
+    const PACKING_SIZE: usize = 4;
 }
 
 #[derive(PrimitiveEnum_u8, Clone, Copy, PartialEq, Debug)]
@@ -60,8 +62,6 @@ pub enum RssiMeasurementValue {
     Agc(MeasurementValueAgc),
 }
 
-const RSSI_OUTPUT_DBM_SIZE: usize = 3;
-
 #[derive(PackedStruct, Clone, Copy, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct MeasurementValueDbm {
@@ -71,7 +71,10 @@ pub struct MeasurementValueDbm {
     pub threshold_configuration_value: i8,
 }
 
-const RSSI_OUTPUT_AGC_SIZE: usize = 4;
+impl MeasurementValueDbm {
+    // +1 for type byte
+    const PACKING_SIZE: usize = 3;
+}
 
 // https://www.thisisant.com/forum/viewthread/4280/
 #[derive(PackedStruct, Clone, Copy, Debug, PartialEq)]
@@ -81,6 +84,11 @@ pub struct MeasurementValueAgc {
     pub threshold_offset: i8,
     #[packed_field(bytes = "1:2")]
     pub register: u16,
+}
+
+impl MeasurementValueAgc {
+    // +1 for type byte
+    const PACKING_SIZE: usize = 4;
 }
 
 impl RssiOutput {
@@ -102,8 +110,6 @@ impl RssiOutput {
     }
 }
 
-const TIMESTAMP_OUTPUT_SIZE: usize = 2;
-
 #[derive(PackedStruct, Clone, Copy, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct TimestampOutput {
@@ -111,7 +117,9 @@ pub struct TimestampOutput {
     pub rx_timestamp: u16,
 }
 
-const FLAG_BYTE_SIZE: usize = 1;
+impl TimestampOutput {
+    const PACKING_SIZE: usize = 2;
+}
 
 #[derive(PackedStruct, Clone, Copy, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
@@ -124,6 +132,10 @@ pub struct FlagByte {
     pub timestamp_output: bool,
     #[packed_field(bits = "0:4")]
     _reserved: ReservedZeroes<packed_bits::Bits5>,
+}
+
+impl FlagByte {
+    const PACKING_SIZE: usize = 1;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -140,7 +152,8 @@ impl ExtendedInfo {
             return Ok(None);
         }
 
-        let flag_byte = FlagByte::unpack_from_slice(&data[..FLAG_BYTE_SIZE])?;
+        let (flag_buf, data) = data.split_at(FlagByte::PACKING_SIZE);
+        let flag_byte = FlagByte::unpack_from_slice(flag_buf)?;
 
         let mut extended_info = ExtendedInfo {
             flag_byte,
@@ -151,19 +164,19 @@ impl ExtendedInfo {
 
         let mut expected_size = 0;
 
-        let data = &data[FLAG_BYTE_SIZE..];
-
         let data = if flag_byte.channel_id_output {
-            let msg_data = if data.len() > CHANNEL_ID_OUTPUT_SIZE {
-                &data[..CHANNEL_ID_OUTPUT_SIZE]
-            } else {
-                data
-            };
+            if data.len() < ChannelIdOutput::PACKING_SIZE {
+                return Err(PackingError::BufferSizeMismatch {
+                    expected: ChannelIdOutput::PACKING_SIZE,
+                    actual: data.len(),
+                });
+            }
+            let (msg_data, data) = data.split_at(ChannelIdOutput::PACKING_SIZE);
 
             extended_info.channel_id_output = Some(ChannelIdOutput::unpack_from_slice(msg_data)?);
-            expected_size += CHANNEL_ID_OUTPUT_SIZE;
+            expected_size += ChannelIdOutput::PACKING_SIZE;
 
-            &data[CHANNEL_ID_OUTPUT_SIZE..]
+            data
         } else {
             data
         };
@@ -173,34 +186,38 @@ impl ExtendedInfo {
             let format =
                 RssiMeasurementType::from_primitive(data[0]).ok_or(PackingError::InvalidValue)?;
             let slice_size = match format {
-                RssiMeasurementType::Agc => RSSI_OUTPUT_AGC_SIZE,
-                RssiMeasurementType::Dbm => RSSI_OUTPUT_DBM_SIZE,
+                RssiMeasurementType::Agc => MeasurementValueAgc::PACKING_SIZE,
+                RssiMeasurementType::Dbm => MeasurementValueDbm::PACKING_SIZE,
             };
-            let msg_data = if data.len() > slice_size {
-                &data[..slice_size]
-            } else {
-                data
-            };
+            if data.len() < slice_size {
+                return Err(PackingError::BufferSizeMismatch {
+                    expected: slice_size,
+                    actual: data.len(),
+                });
+            }
+            let (msg_data, data) = data.split_at(slice_size);
 
             extended_info.rssi_output = Some(RssiOutput::unpack_from_slice(msg_data)?);
             expected_size += slice_size;
 
-            &data[slice_size..]
+            data
         } else {
             data
         };
 
         let data = if flag_byte.timestamp_output {
-            let msg_data = if data.len() > TIMESTAMP_OUTPUT_SIZE {
-                &data[..TIMESTAMP_OUTPUT_SIZE]
-            } else {
-                data
-            };
+            if data.len() < TimestampOutput::PACKING_SIZE {
+                return Err(PackingError::BufferSizeMismatch {
+                    expected: TimestampOutput::PACKING_SIZE,
+                    actual: data.len(),
+                });
+            }
+            let (msg_data, data) = data.split_at(TimestampOutput::PACKING_SIZE);
 
             extended_info.timestamp_output = Some(TimestampOutput::unpack_from_slice(msg_data)?);
-            expected_size += TIMESTAMP_OUTPUT_SIZE;
+            expected_size += TimestampOutput::PACKING_SIZE;
 
-            &data[TIMESTAMP_OUTPUT_SIZE..]
+            data
         } else {
             data
         };
@@ -225,6 +242,10 @@ pub struct BroadcastDataPayload {
     pub data: [u8; 8],
 }
 
+impl BroadcastDataPayload {
+    const PACKING_SIZE: usize = 9;
+}
+
 // TODO test TX
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BroadcastData {
@@ -236,9 +257,10 @@ impl TransmitableMessage for BroadcastData {
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
         // Data payloads have optional RX fields but are ignored on TX
         self.payload
-            .pack_to_slice(&mut buf[..BROADCAST_PAYLOAD_SIZE])?;
-        Ok(BROADCAST_PAYLOAD_SIZE)
+            .pack_to_slice(&mut buf[..BroadcastDataPayload::PACKING_SIZE])?;
+        Ok(BroadcastDataPayload::PACKING_SIZE)
     }
+
     fn get_tx_msg_id(&self) -> TxMessageId {
         TxMessageId::BroadcastData
     }
@@ -249,8 +271,6 @@ impl From<BroadcastData> for TxMessage {
         TxMessage::BroadcastData(msg)
     }
 }
-
-const BROADCAST_PAYLOAD_SIZE: usize = 9;
 
 impl BroadcastData {
     /// Constructs a new `BroadcastData`.
@@ -265,9 +285,16 @@ impl BroadcastData {
     }
 
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<BroadcastData, PackingError> {
+        if data.len() < BroadcastDataPayload::PACKING_SIZE {
+            return Err(PackingError::BufferSizeMismatch {
+                expected: BroadcastDataPayload::PACKING_SIZE,
+                actual: data.len(),
+            });
+        }
+        let (payload, extended) = data.split_at(BroadcastDataPayload::PACKING_SIZE);
         Ok(BroadcastData {
-            payload: BroadcastDataPayload::unpack_from_slice(&data[..BROADCAST_PAYLOAD_SIZE])?,
-            extended_info: ExtendedInfo::unpack_from_slice(&data[BROADCAST_PAYLOAD_SIZE..])?,
+            payload: BroadcastDataPayload::unpack_from_slice(payload)?,
+            extended_info: ExtendedInfo::unpack_from_slice(extended)?,
         })
     }
 }
@@ -286,8 +313,8 @@ impl TransmitableMessage for AcknowledgedData {
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
         // Data payloads have optional RX fields but are ignored on TX
         self.payload
-            .pack_to_slice(&mut buf[..BROADCAST_PAYLOAD_SIZE])?;
-        Ok(BROADCAST_PAYLOAD_SIZE)
+            .pack_to_slice(&mut buf[..BroadcastDataPayload::PACKING_SIZE])?;
+        Ok(BroadcastDataPayload::PACKING_SIZE)
     }
     fn get_tx_msg_id(&self) -> TxMessageId {
         TxMessageId::AcknowledgedData
@@ -313,9 +340,16 @@ impl AcknowledgedData {
     }
 
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<AcknowledgedData, PackingError> {
+        if data.len() < BroadcastDataPayload::PACKING_SIZE {
+            return Err(PackingError::BufferSizeMismatch {
+                expected: BroadcastDataPayload::PACKING_SIZE,
+                actual: data.len(),
+            });
+        }
+        let (payload, extended) = data.split_at(BroadcastDataPayload::PACKING_SIZE);
         Ok(AcknowledgedData {
-            payload: AcknowledgedDataPayload::unpack_from_slice(&data[..BROADCAST_PAYLOAD_SIZE])?,
-            extended_info: ExtendedInfo::unpack_from_slice(&data[BROADCAST_PAYLOAD_SIZE..])?,
+            payload: AcknowledgedDataPayload::unpack_from_slice(payload)?,
+            extended_info: ExtendedInfo::unpack_from_slice(extended)?,
         })
     }
 }
@@ -338,6 +372,10 @@ pub struct BurstTransferDataPayload {
     pub data: [u8; 8],
 }
 
+impl BurstTransferDataPayload {
+    const PACKING_SIZE: usize = 9;
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BurstTransferData {
     pub payload: BurstTransferDataPayload,
@@ -349,8 +387,8 @@ impl TransmitableMessage for BurstTransferData {
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
         // Data payloads have optional RX fields but are ignored on TX
         self.payload
-            .pack_to_slice(&mut buf[..BURSTTRANSFER_PAYLOAD_SIZE])?;
-        Ok(BURSTTRANSFER_PAYLOAD_SIZE)
+            .pack_to_slice(&mut buf[..BurstTransferDataPayload::PACKING_SIZE])?;
+        Ok(BurstTransferDataPayload::PACKING_SIZE)
     }
     fn get_tx_msg_id(&self) -> TxMessageId {
         TxMessageId::BurstTransferData
@@ -362,8 +400,6 @@ impl From<BurstTransferData> for TxMessage {
         TxMessage::BurstTransferData(msg)
     }
 }
-
-const BURSTTRANSFER_PAYLOAD_SIZE: usize = 9;
 
 impl BurstTransferData {
     /// Constructs a new `BurstTransferData`.
@@ -378,11 +414,13 @@ impl BurstTransferData {
     }
 
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<BurstTransferData, PackingError> {
+        if data.len() < BurstTransferDataPayload::PACKING_SIZE {
+            return Err(PackingError::BufferSizeMismatch {expected: BurstTransferDataPayload::PACKING_SIZE, actual: data.len() });
+        }
+        let (payload, extended) = data.split_at(BurstTransferDataPayload::PACKING_SIZE);
         Ok(BurstTransferData {
-            payload: BurstTransferDataPayload::unpack_from_slice(
-                &data[..BURSTTRANSFER_PAYLOAD_SIZE],
-            )?,
-            extended_info: ExtendedInfo::unpack_from_slice(&data[BURSTTRANSFER_PAYLOAD_SIZE..])?,
+            payload: BurstTransferDataPayload::unpack_from_slice(payload)?,
+            extended_info: ExtendedInfo::unpack_from_slice(extended)?,
         })
     }
 }

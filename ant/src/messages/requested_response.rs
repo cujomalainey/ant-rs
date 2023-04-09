@@ -59,8 +59,6 @@ impl AntVersion {
     }
 }
 
-const BASECAPABILITIES_SIZE: usize = 4;
-
 #[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "4")]
 pub struct BaseCapabilities {
@@ -72,6 +70,10 @@ pub struct BaseCapabilities {
     pub standard_options: StandardOptions,
     #[packed_field(bytes = "3")]
     pub advanced_options: AdvancedOptions,
+}
+
+impl BaseCapabilities {
+    const PACKING_SIZE: usize = 4;
 }
 
 #[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
@@ -114,7 +116,6 @@ pub struct AdvancedOptions {
     pub search_list_enabled: bool,
 }
 
-const ADVANCEDOPTIONS2_SIZE: usize = 1;
 #[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct AdvancedOptions2 {
@@ -136,7 +137,10 @@ pub struct AdvancedOptions2 {
     pub fit1_enabled: bool,
 }
 
-const ADVANCEDOPTIONS3_SIZE: usize = 1;
+impl AdvancedOptions2 {
+    const PACKING_SIZE: usize = 1;
+}
+
 #[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct AdvancedOptions3 {
@@ -158,7 +162,10 @@ pub struct AdvancedOptions3 {
     pub encrypted_channel_enabled: bool,
 }
 
-const ADVANCEDOPTIONS4_SIZE: usize = 1;
+impl AdvancedOptions3 {
+    const PACKING_SIZE: usize = 1;
+}
+
 #[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct AdvancedOptions4 {
@@ -167,7 +174,11 @@ pub struct AdvancedOptions4 {
     #[packed_field(bits = "1:7")]
     _reserved: ReservedZeroes<packed_bits::Bits7>,
 }
-const MAX_SENSRCORE_CHANNELS_SIZE: usize = 1;
+
+impl AdvancedOptions4 {
+    const PACKING_SIZE: usize = 1;
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Capabilities {
     pub base_capabilities: BaseCapabilities,
@@ -179,10 +190,11 @@ pub struct Capabilities {
 
 // TODO test
 impl Capabilities {
+    const MAX_SENSRCORE_CHANNELS_SIZE: usize = 1;
+
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<Self, PackingError> {
-        let base_capabilities =
-            BaseCapabilities::unpack_from_slice(&data[..BASECAPABILITIES_SIZE])?;
-        let data = &data[BASECAPABILITIES_SIZE..];
+        let (base_buf, data) = data.split_at(BaseCapabilities::PACKING_SIZE);
+        let base_capabilities = BaseCapabilities::unpack_from_slice(base_buf)?;
 
         if data.is_empty() {
             return Ok(Capabilities {
@@ -194,9 +206,8 @@ impl Capabilities {
             });
         }
 
-        let advanced_options2 =
-            AdvancedOptions2::unpack_from_slice(&data[..ADVANCEDOPTIONS2_SIZE])?;
-        let data = &data[ADVANCEDOPTIONS2_SIZE..];
+        let (adv2_buf, data) = data.split_at(AdvancedOptions2::PACKING_SIZE);
+        let advanced_options2 = AdvancedOptions2::unpack_from_slice(adv2_buf)?;
 
         if data.is_empty() {
             return Ok(Capabilities {
@@ -209,7 +220,7 @@ impl Capabilities {
         }
 
         let max_sensrcore_channels = data[0];
-        let data = &data[MAX_SENSRCORE_CHANNELS_SIZE..];
+        let data = &data[Self::MAX_SENSRCORE_CHANNELS_SIZE..];
 
         if data.is_empty() {
             return Ok(Capabilities {
@@ -221,9 +232,8 @@ impl Capabilities {
             });
         }
 
-        let advanced_options3 =
-            AdvancedOptions3::unpack_from_slice(&data[..ADVANCEDOPTIONS3_SIZE])?;
-        let data = &data[ADVANCEDOPTIONS3_SIZE..];
+        let (adv3_buf, data) = data.split_at(AdvancedOptions3::PACKING_SIZE);
+        let advanced_options3 = AdvancedOptions3::unpack_from_slice(adv3_buf)?;
 
         if data.is_empty() {
             return Ok(Capabilities {
@@ -235,9 +245,8 @@ impl Capabilities {
             });
         }
 
-        let advanced_options4 =
-            AdvancedOptions4::unpack_from_slice(&data[..ADVANCEDOPTIONS4_SIZE])?;
-        let data = &data[ADVANCEDOPTIONS4_SIZE..];
+        let (adv4_buf, data) = data.split_at(AdvancedOptions4::PACKING_SIZE);
+        let advanced_options4 = AdvancedOptions4::unpack_from_slice(adv4_buf)?;
 
         if data.is_empty() {
             return Ok(Capabilities {
@@ -249,11 +258,11 @@ impl Capabilities {
             });
         }
 
-        let expected_size = BASECAPABILITIES_SIZE
-            + ADVANCEDOPTIONS2_SIZE
-            + MAX_SENSRCORE_CHANNELS_SIZE
-            + ADVANCEDOPTIONS3_SIZE
-            + ADVANCEDOPTIONS4_SIZE;
+        let expected_size = BaseCapabilities::PACKING_SIZE
+            + AdvancedOptions2::PACKING_SIZE
+            + Self::MAX_SENSRCORE_CHANNELS_SIZE
+            + AdvancedOptions3::PACKING_SIZE
+            + AdvancedOptions4::PACKING_SIZE;
         Err(PackingError::BufferSizeMismatch {
             expected: expected_size,
             actual: expected_size + data.len(),

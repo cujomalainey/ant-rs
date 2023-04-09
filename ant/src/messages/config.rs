@@ -276,9 +276,6 @@ pub struct ChannelRfFrequency {
     pub rf_frequency: u8,
 }
 
-/// Size of a default network key
-pub const NETWORK_KEY_SIZE: usize = 8;
-
 /// Represents a Set Network Key message (0x46)
 #[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "9")]
@@ -293,6 +290,11 @@ pub struct SetNetworkKey {
     /// To use ANT+ or ANT-FS please go to [thisisant](http://www.thisisant.com/developer/ant-plus/ant-plus-basics/network-keys/) to get the appropriate keys
     #[packed_field(bytes = "1:8")]
     pub network_key: [u8; 8], // AKA NETWORK_KEY_SIZE but PackedStruct doens't like const
+}
+
+impl SetNetworkKey {
+    /// Size of a default network key
+    pub const NETWORK_KEY_SIZE: usize = 8;
 }
 
 /// Represents a Transmit Power message (0x47)
@@ -701,6 +703,10 @@ pub struct ConfigureAdvancedBurstData {
     pub optional_features: SupportedFeatures,
 }
 
+impl ConfigureAdvancedBurstData {
+    const PACKING_SIZE: usize = 9;
+}
+
 /// Represents a Configure Advanced Burst message (0x78)
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ConfigureAdvancedBurst {
@@ -715,20 +721,24 @@ pub struct ConfigureAdvancedBurst {
     pub retry_count_extension: Option<Integer<u8, packed_bits::Bits8>>,
 }
 
-const CONFIGURE_ADVANCED_BURST_DATA_SIZE: usize = 9;
+impl ConfigureAdvancedBurst {
+    const STALL_COUNT_SIZE: usize = 2;
+    const RETRY_COUNT_EXTENSION_SIZE: usize = 1;
+}
 
 impl TransmitableMessage for ConfigureAdvancedBurst {
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
-        let mut len = CONFIGURE_ADVANCED_BURST_DATA_SIZE;
-        self.data
-            .pack_to_slice(&mut buf[..CONFIGURE_ADVANCED_BURST_DATA_SIZE])?;
+        let mut len = ConfigureAdvancedBurstData::PACKING_SIZE;
+        let (data_buf, buf) = buf.split_at_mut(len);
+        self.data.pack_to_slice(data_buf)?;
         if let Some(data) = self.stall_count {
-            buf[CONFIGURE_ADVANCED_BURST_DATA_SIZE..CONFIGURE_ADVANCED_BURST_DATA_SIZE + 2]
-                .copy_from_slice(data.to_lsb_bytes()?.as_slice());
-            len += 2;
+            let (stall_buf, buf) = buf.split_at_mut(ConfigureAdvancedBurst::STALL_COUNT_SIZE);
+            len += ConfigureAdvancedBurst::STALL_COUNT_SIZE;
+            stall_buf.copy_from_slice(data.to_lsb_bytes()?.as_slice());
+            let retry_buf = &mut buf[..ConfigureAdvancedBurst::RETRY_COUNT_EXTENSION_SIZE];
             if let Some(retry_count) = self.retry_count_extension {
-                buf[len..len + 1].copy_from_slice(retry_count.to_lsb_bytes()?.as_slice());
-                len += 1;
+                retry_buf.copy_from_slice(retry_count.to_lsb_bytes()?.as_slice());
+                len += ConfigureAdvancedBurst::RETRY_COUNT_EXTENSION_SIZE;
             }
         } else if self.stall_count.is_none() && self.retry_count_extension.is_some() {
             return Err(PackingError::InvalidValue);
@@ -765,10 +775,8 @@ impl ConfigureAdvancedBurst {
     }
 
     pub(crate) fn unpack_from_slice(buf: &[u8]) -> Result<ConfigureAdvancedBurst, PackingError> {
-        let data = ConfigureAdvancedBurstData::unpack_from_slice(
-            &buf[..CONFIGURE_ADVANCED_BURST_DATA_SIZE],
-        )?;
-        let buf = &buf[CONFIGURE_ADVANCED_BURST_DATA_SIZE..];
+        let (data_buf, buf) = buf.split_at(ConfigureAdvancedBurstData::PACKING_SIZE);
+        let data = ConfigureAdvancedBurstData::unpack_from_slice(&data_buf)?;
 
         let mut msg = ConfigureAdvancedBurst {
             data,
@@ -787,14 +795,14 @@ impl ConfigureAdvancedBurst {
             });
         }
 
-        let stall_count_bytes = match buf[..2].try_into() {
+        let (stall_buf, buf) = buf.split_at(2);
+        let stall_count_bytes = match stall_buf.try_into() {
             Ok(x) => x,
             Err(_) => return Err(PackingError::SliceIndexingError { slice_len: 2 }),
         };
         msg.stall_count = Some(Integer::<u16, packed_bits::Bits16>::from_lsb_bytes(
             stall_count_bytes,
         )?);
-        let buf = &buf[2..];
 
         if buf.is_empty() {
             return Ok(msg);
