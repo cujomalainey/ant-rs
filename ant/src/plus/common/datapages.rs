@@ -115,6 +115,7 @@ pub enum CommandStatusValue {
     Uninitialized = 255,
 }
 
+// TODO add consts for invalid validation
 #[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct CommandStatus {
