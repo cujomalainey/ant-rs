@@ -415,7 +415,10 @@ impl BurstTransferData {
 
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<BurstTransferData, PackingError> {
         if data.len() < BurstTransferDataPayload::PACKING_SIZE {
-            return Err(PackingError::BufferSizeMismatch {expected: BurstTransferDataPayload::PACKING_SIZE, actual: data.len() });
+            return Err(PackingError::BufferSizeMismatch {
+                expected: BurstTransferDataPayload::PACKING_SIZE,
+                actual: data.len(),
+            });
         }
         let (payload, extended) = data.split_at(BurstTransferDataPayload::PACKING_SIZE);
         Ok(BurstTransferData {
