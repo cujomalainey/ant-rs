@@ -398,8 +398,6 @@ pub struct MultiComponentSystemProductInformation {
     pub common_product_information: CommonProductInformation,
 }
 
-// TODO extract product and manufacter data info into separate struct for multi and regular
-
 #[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "8")]
 pub struct ManufacturersInformation {
