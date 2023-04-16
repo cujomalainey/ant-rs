@@ -37,7 +37,6 @@ pub struct ChannelStatus {
     pub channel_state: ChannelState,
 }
 
-// TODO test
 #[derive(Clone, Debug, PartialEq)]
 pub struct AntVersion {
     version: ArrayVec<u8, MAX_MESSAGE_DATA_SIZE>,
@@ -80,11 +79,11 @@ impl BaseCapabilities {
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct StandardOptions {
     #[packed_field(bits = "0")]
-    pub no_recieve_channels: bool,
+    pub no_receive_channels: bool,
     #[packed_field(bits = "1")]
     pub no_transmit_channels: bool,
     #[packed_field(bits = "2")]
-    pub no_recieve_messages: bool,
+    pub no_receive_messages: bool,
     #[packed_field(bits = "3")]
     pub no_transmit_messages: bool,
     #[packed_field(bits = "4")]
@@ -188,7 +187,6 @@ pub struct Capabilities {
     pub advanced_options4: Option<AdvancedOptions4>,
 }
 
-// TODO test
 impl Capabilities {
     const MAX_SENSRCORE_CHANNELS_SIZE: usize = 1;
 
@@ -270,9 +268,8 @@ impl Capabilities {
     }
 }
 
-// TODO test
 #[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
-#[packed_struct(bit_numbering = "lsb0", size_bytes = "5")]
+#[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "5")]
 pub struct AdvancedBurstCapabilities {
     #[packed_field(bytes = "0")]
     _reserved: ReservedZeroes<packed_bits::Bits8>,
@@ -422,9 +419,9 @@ mod tests {
         let unpacked = BaseCapabilities::unpack_from_slice(&[15, 4, 0x15, 0x52]).unwrap();
         assert_eq!(unpacked.max_ant_channels, 15);
         assert_eq!(unpacked.max_networks, 4);
-        assert_eq!(unpacked.standard_options.no_recieve_channels, true);
+        assert_eq!(unpacked.standard_options.no_receive_channels, true);
         assert_eq!(unpacked.standard_options.no_transmit_channels, false);
-        assert_eq!(unpacked.standard_options.no_recieve_messages, true);
+        assert_eq!(unpacked.standard_options.no_receive_messages, true);
         assert_eq!(unpacked.standard_options.no_transmit_messages, false);
         assert_eq!(unpacked.standard_options.no_acked_messages, true);
         assert_eq!(unpacked.standard_options.no_burst_messages, false);
@@ -439,9 +436,9 @@ mod tests {
     #[test]
     fn standard_options() {
         let unpacked = StandardOptions::unpack_from_slice(&[0x2A]).unwrap();
-        assert_eq!(unpacked.no_recieve_channels, false);
+        assert_eq!(unpacked.no_receive_channels, false);
         assert_eq!(unpacked.no_transmit_channels, true);
-        assert_eq!(unpacked.no_recieve_messages, false);
+        assert_eq!(unpacked.no_receive_messages, false);
         assert_eq!(unpacked.no_transmit_messages, true);
         assert_eq!(unpacked.no_acked_messages, false);
         assert_eq!(unpacked.no_burst_messages, true);
@@ -490,6 +487,140 @@ mod tests {
     }
 
     #[test]
+    fn capabilities() {
+        let unpacked =
+            Capabilities::unpack_from_slice(&[16, 4, 0x15, 0x82, 4, 8, 0x40, 1]).unwrap();
+        assert_eq!(unpacked.base_capabilities.max_ant_channels, 16);
+        assert_eq!(unpacked.base_capabilities.max_networks, 4);
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .standard_options
+                .no_receive_channels,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .standard_options
+                .no_receive_messages,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .standard_options
+                .no_acked_messages,
+            true
+        );
+        assert_eq!(
+            unpacked.base_capabilities.advanced_options.network_enabled,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .advanced_options
+                .search_list_enabled,
+            true
+        );
+        assert_eq!(unpacked.advanced_options2.unwrap().scan_mode_enabled, true);
+        assert_eq!(unpacked.max_sensrcore_channels.unwrap(), 8);
+        assert_eq!(
+            unpacked
+                .advanced_options3
+                .unwrap()
+                .selective_data_updates_enabled,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .advanced_options4
+                .unwrap()
+                .rfactive_notification_enabled,
+            true
+        );
+        let unpacked = Capabilities::unpack_from_slice(&[16, 4, 0x15, 0x82]).unwrap();
+        assert_eq!(unpacked.base_capabilities.max_ant_channels, 16);
+        assert_eq!(unpacked.base_capabilities.max_networks, 4);
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .standard_options
+                .no_receive_channels,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .standard_options
+                .no_receive_messages,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .standard_options
+                .no_acked_messages,
+            true
+        );
+        assert_eq!(
+            unpacked.base_capabilities.advanced_options.network_enabled,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .advanced_options
+                .search_list_enabled,
+            true
+        );
+        assert_eq!(unpacked.advanced_options2.is_none(), true);
+        assert_eq!(unpacked.max_sensrcore_channels.is_none(), true);
+        assert_eq!(unpacked.advanced_options3.is_none(), true);
+        assert_eq!(unpacked.advanced_options4.is_none(), true);
+        let unpacked = Capabilities::unpack_from_slice(&[16, 4, 0x15, 0x82, 4, 8]).unwrap();
+        assert_eq!(unpacked.base_capabilities.max_ant_channels, 16);
+        assert_eq!(unpacked.base_capabilities.max_networks, 4);
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .standard_options
+                .no_receive_channels,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .standard_options
+                .no_receive_messages,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .standard_options
+                .no_acked_messages,
+            true
+        );
+        assert_eq!(
+            unpacked.base_capabilities.advanced_options.network_enabled,
+            true
+        );
+        assert_eq!(
+            unpacked
+                .base_capabilities
+                .advanced_options
+                .search_list_enabled,
+            true
+        );
+        assert_eq!(unpacked.advanced_options2.unwrap().scan_mode_enabled, true);
+        assert_eq!(unpacked.max_sensrcore_channels.unwrap(), 8);
+        assert_eq!(unpacked.advanced_options3.is_none(), true);
+        assert_eq!(unpacked.advanced_options4.is_none(), true);
+    }
+
+    #[test]
     fn channel_status() {
         let unpacked = ChannelStatus::unpack(&[1, 0x36]).unwrap();
         assert_eq!(unpacked.channel_number, 1);
@@ -513,6 +644,19 @@ mod tests {
         assert_eq!(unpacked.config, EventBufferConfig::BufferAllEvents);
         assert_eq!(unpacked.size, 0xBBAA);
         assert_eq!(unpacked.time, 0xDDCC);
+    }
+
+    #[test]
+    fn advanced_burst_capabilities() {
+        let unpacked = AdvancedBurstCapabilities::unpack(&[0, 2, 1, 0, 0]).unwrap();
+        assert_eq!(
+            unpacked.supported_max_packed_length,
+            AdvancedBurstMaxPacketLength::Max16Byte
+        );
+        assert_eq!(
+            unpacked.supported_features.adv_burst_frequency_hop_enabled,
+            true
+        );
     }
 
     #[test]
