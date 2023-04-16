@@ -68,12 +68,14 @@ pub enum ChannelEventExtension {
     EncryptNegotiationFail(EncryptionId),
 }
 
+// TODO On PC applications ADV burst comes in through this event type, need to add another layer of
+// abstraction
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ChannelEvent {
     pub payload: ChannelEventPayload,
     pub extended_info: Option<ChannelEventExtension>,
 }
-// TODO test
+
 impl ChannelEvent {
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<Self, PackingError> {
         let payload = ChannelEventPayload::unpack_from_slice(data)?;
@@ -107,6 +109,12 @@ mod tests {
         assert_eq!(unpacked.channel_number, 1);
         assert_eq!(unpacked.message_id, TxMessageId::LibConfig);
         assert_eq!(unpacked.message_code, MessageCode::ResponseNoError);
+        Ok(())
+    }
+
+    #[test]
+    fn channel_event() -> Result<(), PackingError> {
+        // TODO test
         Ok(())
     }
 }
