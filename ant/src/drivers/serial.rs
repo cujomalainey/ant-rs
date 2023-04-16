@@ -15,13 +15,12 @@ use embedded_hal::digital::v2::{OutputPin, PinState};
 use embedded_hal::serial::Read;
 use embedded_hal::serial::Write;
 use nb;
-use std::cell::RefCell;
 use std::cmp;
 
 pub struct SerialDriver<SERIAL, PIN> {
     serial: SERIAL,
     sleep: Option<PIN>,
-    buffer: RefCell<Buffer>, // TODO change this dependency injection so user controls the size
+    buffer: Buffer, // TODO change this dependency injection so user controls the size
 }
 
 impl<SERIAL, SLEEP> SerialDriver<SERIAL, SLEEP>
@@ -33,7 +32,7 @@ where
         SerialDriver {
             serial,
             sleep,
-            buffer: RefCell::new(Buffer::new()),
+            buffer: Buffer::new(),
         }
     }
 
@@ -67,11 +66,7 @@ where
     SLEEP: OutputPin,
 {
     fn get_message(&mut self) -> Result<Option<AntMessage>, DriverError<R, W>> {
-        // if we recursed this will fail
-        let mut buf = match self.buffer.try_borrow_mut() {
-            Err(_) => return Err(DriverError::ReferenceError()),
-            Ok(b) => b,
-        };
+        let buf = &mut self.buffer;
 
         // Attempt to parse remaining contents of the buffer before reading
         // find the start of a message if not a usb driver. USB does bulk transfer with full
@@ -87,9 +82,9 @@ where
                 buf.drain(msg_start..);
             }
         }
-        let msg = parse_buffer(&buf);
+        let msg = parse_buffer(buf);
 
-        update_buffer(&msg, &mut buf);
+        update_buffer(&msg, buf);
 
         if Ok(None) != msg {
             return msg;
@@ -108,9 +103,9 @@ where
             }
         }
 
-        let msg_result = parse_buffer(&buf);
+        let msg_result = parse_buffer(buf);
 
-        update_buffer(&msg_result, &mut buf);
+        update_buffer(&msg_result, buf);
 
         msg_result
     }
@@ -261,7 +256,7 @@ mod tests {
             out_bytes: vec![],
         };
         let driver = SerialDriver::<_, StubPin>::new(context, None);
-        let mut buf = driver.buffer.borrow_mut();
+        let mut buf = driver.buffer;
         [2, 3, 4, 5, 6].iter().for_each(|x| buf.push(*x));
         update_buffer::<SerialError, SerialError>(&Err(DriverError::BadChecksum(0, 0)), &mut buf);
         assert_eq!(buf.as_slice(), [3, 4, 5, 6]);
@@ -329,7 +324,7 @@ mod tests {
                 checksum: 220,
             }))
         );
-        assert!(driver.buffer.borrow().is_empty());
+        assert!(driver.buffer.is_empty());
         driver.serial.validate();
     }
 
@@ -392,7 +387,7 @@ mod tests {
                 checksum: 220,
             }))
         );
-        assert!(driver.buffer.borrow().is_empty());
+        assert!(driver.buffer.is_empty());
         driver.serial.validate();
     }
 
