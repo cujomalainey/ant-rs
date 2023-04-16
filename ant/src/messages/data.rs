@@ -9,6 +9,7 @@
 use crate::messages::{TransmitableMessage, TxMessage, TxMessageId};
 use arrayvec::ArrayVec;
 use const_utils::{max, min};
+use derive_new::new;
 use konst::{option::unwrap_or, primitive::parse_usize, unwrap_ctx};
 use packed_struct::prelude::*;
 
@@ -352,7 +353,7 @@ impl AcknowledgedData {
     }
 }
 
-#[derive(PackedStruct, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct ChannelSequence {
     #[packed_field(bits = "7:5")]
@@ -579,64 +580,83 @@ mod tests {
 
     #[test]
     fn broadcast_data() {
-        let packed = BroadcastData::unpack_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
-        assert_eq!(packed.payload.channel_number, 0);
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(packed.extended_info, None);
-        let packed =
+        let unpacked = BroadcastData::unpack_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
+        assert_eq!(unpacked.payload.channel_number, 0);
+        assert_eq!(unpacked.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(unpacked.extended_info, None);
+        let unpacked =
             BroadcastData::unpack_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 0x20, 0xBB, 0xAA])
                 .unwrap();
-        assert_eq!(packed.payload.channel_number, 0);
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        let ext_info = packed.extended_info.unwrap();
+        assert_eq!(unpacked.payload.channel_number, 0);
+        assert_eq!(unpacked.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
+        let ext_info = unpacked.extended_info.unwrap();
         assert_eq!(ext_info.flag_byte.channel_id_output, false);
         assert_eq!(ext_info.flag_byte.rssi_output, false);
         assert_eq!(ext_info.flag_byte.timestamp_output, true);
         assert_eq!(ext_info.timestamp_output.unwrap().rx_timestamp, 0xAABB);
 
-        // TODO TX
+        let mut buf: [u8; 12] = [0; 12];
+        let size = BroadcastData::new(5, [5, 6, 7, 8, 9, 0, 1, 2])
+            .serialize_message(&mut buf)
+            .unwrap();
+        assert_eq!(buf, [5, 5, 6, 7, 8, 9, 0, 1, 2, 0, 0, 0]);
+        assert_eq!(size, 9);
     }
 
     #[test]
     fn acknowledged_data() {
-        let packed = AcknowledgedData::unpack_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
-        assert_eq!(packed.payload.channel_number, 0);
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(packed.extended_info, None);
-        let packed =
+        let unpacked = AcknowledgedData::unpack_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
+        assert_eq!(unpacked.payload.channel_number, 0);
+        assert_eq!(unpacked.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(unpacked.extended_info, None);
+        let unpacked =
             AcknowledgedData::unpack_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 0x20, 0xBB, 0xAA])
                 .unwrap();
-        assert_eq!(packed.payload.channel_number, 0);
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        let ext_info = packed.extended_info.unwrap();
+        assert_eq!(unpacked.payload.channel_number, 0);
+        assert_eq!(unpacked.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
+        let ext_info = unpacked.extended_info.unwrap();
         assert_eq!(ext_info.flag_byte.channel_id_output, false);
         assert_eq!(ext_info.flag_byte.rssi_output, false);
         assert_eq!(ext_info.flag_byte.timestamp_output, true);
         assert_eq!(ext_info.timestamp_output.unwrap().rx_timestamp, 0xAABB);
 
-        // TODO TX
+        let mut buf: [u8; 12] = [0; 12];
+        let size = AcknowledgedData::new(5, [5, 6, 7, 8, 9, 0, 1, 2])
+            .serialize_message(&mut buf)
+            .unwrap();
+        assert_eq!(buf, [5, 5, 6, 7, 8, 9, 0, 1, 2, 0, 0, 0]);
+        assert_eq!(size, 9);
     }
 
     #[test]
     fn burst_transfer_data() {
-        let packed = BurstTransferData::unpack_from_slice(&[0x21, 1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
-        assert_eq!(packed.payload.channel_sequence.channel_number, 1.into());
-        assert_eq!(packed.payload.channel_sequence.sequence_number, 1.into());
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(packed.extended_info, None);
-        let packed =
+        let unpacked =
+            BurstTransferData::unpack_from_slice(&[0x21, 1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
+        assert_eq!(unpacked.payload.channel_sequence.channel_number, 1.into());
+        assert_eq!(unpacked.payload.channel_sequence.sequence_number, 1.into());
+        assert_eq!(unpacked.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(unpacked.extended_info, None);
+        let unpacked =
             BurstTransferData::unpack_from_slice(&[0x20, 1, 2, 3, 4, 5, 6, 7, 8, 0x20, 0xBB, 0xAA])
                 .unwrap();
-        assert_eq!(packed.payload.channel_sequence.channel_number, 0.into());
-        assert_eq!(packed.payload.channel_sequence.sequence_number, 1.into());
-        assert_eq!(packed.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
-        let ext_info = packed.extended_info.unwrap();
+        assert_eq!(unpacked.payload.channel_sequence.channel_number, 0.into());
+        assert_eq!(unpacked.payload.channel_sequence.sequence_number, 1.into());
+        assert_eq!(unpacked.payload.data, [1, 2, 3, 4, 5, 6, 7, 8]);
+        let ext_info = unpacked.extended_info.unwrap();
         assert_eq!(ext_info.flag_byte.channel_id_output, false);
         assert_eq!(ext_info.flag_byte.rssi_output, false);
         assert_eq!(ext_info.flag_byte.timestamp_output, true);
         assert_eq!(ext_info.timestamp_output.unwrap().rx_timestamp, 0xAABB);
 
-        // TODO TX
+        let mut buf: [u8; 12] = [0; 12];
+        let size = BurstTransferData::new(
+            ChannelSequence::new(2.into(), 4.into()),
+            [5, 6, 7, 8, 9, 0, 1, 2],
+        )
+        .serialize_message(&mut buf)
+        .unwrap();
+        assert_eq!(buf, [0x44, 5, 6, 7, 8, 9, 0, 1, 2, 0, 0, 0]);
+        assert_eq!(size, 9);
     }
 
     #[test]
