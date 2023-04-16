@@ -40,7 +40,7 @@ type SharedChannel = Rc<RefCell<dyn Channel>>;
 pub struct Router<R, W, D: Driver<R, W>> {
     channels: [Option<SharedChannel>; MAX_CHANNELS],
     max_channels: Cell<usize>, // what the hardware reports as some have less than max
-    driver: RefCell<D>,
+    driver: D,
     reset_restore: Cell<bool>,
     rx_message_callback: Option<fn(&AntMessage)>,
     _read_marker: PhantomData<R>,
@@ -68,14 +68,14 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
             RequestableMessageId::Capabilities,
             None,
         ))?;
-        let router = Self {
+        let mut router = Self {
             channels: [
                 None, None, None, None, None, None, None, None, None, None, None, None, None, None,
                 None,
             ],
             max_channels: Cell::new(0),
             reset_restore: Cell::new(false),
-            driver: RefCell::new(driver),
+            driver,
             rx_message_callback: None,
             _read_marker: PhantomData,
             _write_marker: PhantomData,
@@ -131,8 +131,8 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     ///
     /// If you think the radio is not responding it is best to [Router::release] the driver and issue a
     /// reset via a hardware mechanism then rebuild.
-    pub fn reset(&self, restore: bool) -> Result<(), DriverError<R, W>> {
-        self.driver.borrow_mut().send_message(&ResetSystem::new())?;
+    pub fn reset(&mut self, restore: bool) -> Result<(), DriverError<R, W>> {
+        self.driver.send_message(&ResetSystem::new())?;
         self.reset_restore.set(restore);
         if !restore {
             // TODO release profiles
@@ -141,8 +141,8 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     }
 
     /// Transmit a message to the radio
-    pub fn send(&self, msg: &dyn TransmitableMessage) -> Result<(), RouterError> {
-        self.driver.borrow_mut().send_message(msg)?;
+    pub fn send(&mut self, msg: &dyn TransmitableMessage) -> Result<(), RouterError> {
+        self.driver.send_message(msg)?;
         Ok(())
     }
 
@@ -168,9 +168,8 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
                     .set_channel(ChannelAssignment::UnAssigned());
             }
             // TODO maybe reset channel?
-            let mut driver = self.driver.borrow_mut();
-            driver.send_message(&CloseChannel::new(x as u8))?;
-            driver.send_message(&UnAssignChannel::new(x as u8))?;
+            self.driver.send_message(&CloseChannel::new(x as u8))?;
+            self.driver.send_message(&UnAssignChannel::new(x as u8))?;
             return Ok(());
         }
         Err(RouterError::ChannelNotAssociated())
@@ -263,26 +262,26 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     }
 
     /// Parse all incoming messages and run callbacks
-    pub fn process(&self) -> Result<(), RouterError> {
-        while let Some(msg) = self.driver.borrow_mut().get_message()? {
+    pub fn process(&mut self) -> Result<(), RouterError> {
+        while let Some(msg) = self.driver.get_message()? {
             self.handle_message(&msg)?;
         }
+        let driver = &mut self.driver;
         self.channels
             .iter()
             .flatten()
-            .try_for_each(|x| self.send_channel(x))
-    }
-
-    pub fn send_channel(&self, channel: &SharedChannel) -> Result<(), RouterError> {
-        let mut driver = self.driver.borrow_mut();
-        while let Some(msg) = channel.borrow_mut().send_message() {
-            driver.send_message(&msg)?;
-        }
-        Ok(())
+            .try_for_each(|x| Self::send_channel(driver, x))
     }
 
     /// Teardown router and return driver
     pub fn release(self) -> D {
-        self.driver.into_inner()
+        self.driver
+    }
+
+    fn send_channel(driver: &mut D, channel: &SharedChannel) -> Result<(), RouterError> {
+        while let Some(msg) = channel.borrow_mut().send_message() {
+            driver.send_message(&msg)?;
+        }
+        Ok(())
     }
 }
