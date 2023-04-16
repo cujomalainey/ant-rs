@@ -246,7 +246,6 @@ impl BroadcastDataPayload {
     const PACKING_SIZE: usize = 9;
 }
 
-// TODO test TX
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BroadcastData {
     pub payload: BroadcastDataPayload,
@@ -308,7 +307,6 @@ pub struct AcknowledgedData {
     pub extended_info: Option<ExtendedInfo>,
 }
 
-// TODO test TX
 impl TransmitableMessage for AcknowledgedData {
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
         // Data payloads have optional RX fields but are ignored on TX
@@ -382,7 +380,6 @@ pub struct BurstTransferData {
     pub extended_info: Option<ExtendedInfo>,
 }
 
-// TODO test TX
 impl TransmitableMessage for BurstTransferData {
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
         // Data payloads have optional RX fields but are ignored on TX
@@ -459,7 +456,6 @@ impl AdvancedBurstData {
 }
 
 impl TransmitableMessage for AdvancedBurstData {
-    // TODO test
     fn serialize_message(&self, buf: &mut [u8]) -> Result<usize, PackingError> {
         let sequence_size = ChannelSequence::packed_bytes_size(None)?;
         let len = sequence_size + self.data.len();
