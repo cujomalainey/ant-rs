@@ -6,7 +6,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub use crate::messages::config::{DeviceType, TransmissionType};
+pub use crate::messages::config::{
+    DeviceType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
+};
 use ant_derive::DataPage;
 use derive_new::new;
 use packed_struct::prelude::*;
@@ -340,7 +342,7 @@ pub struct ModeSettings {
     pub sport_mode: SportMode,
 }
 
-#[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct ComponentIdentifier {
     #[packed_field(bits = "0:3")]
@@ -566,13 +568,13 @@ pub enum Units {
     Tera = 0b11,
 }
 
-#[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
+#[derive(PackedStruct, new, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct TotalSizeUnit {
-    #[packed_field(bits = "0:6", ty = "enum")]
-    pub units: Units,
     #[packed_field(bits = "7", ty = "enum")]
     pub base_units: BaseUnits,
+    #[packed_field(bits = "0:6", ty = "enum")]
+    pub units: Units,
 }
 
 #[derive(PackedStruct, DataPage, new, Copy, Clone, Debug, PartialEq)]
@@ -659,12 +661,12 @@ pub struct ErrorDescription {
     #[new(default)]
     #[packed_field(bytes = "1")]
     _reserved0: ReservedOnes<packed_bits::Bits8>,
-    #[packed_field(bits = "16:19")]
+    #[packed_field(bits = "20:23")]
     pub system_component_identifier: Integer<u8, packed_bits::Bits4>,
     #[new(default)]
-    #[packed_field(bits = "20:21")]
+    #[packed_field(bits = "18:19")]
     _reserved1: ReservedZeroes<packed_bits::Bits2>,
-    #[packed_field(bits = "22:23", ty = "enum")]
+    #[packed_field(bits = "16:17", ty = "enum")]
     pub error_level: ErrorLevel,
     #[packed_field(bytes = "3")]
     pub profile_specific_error_codes: u8,
@@ -678,12 +680,20 @@ mod tests {
 
     #[test]
     fn ant_fs_client_beacon() {
-        // TODO
+        let packed = AntFsClientBeacon::new(0, 1, 2, [5, 6, 7, 8])
+            .pack()
+            .unwrap();
+
+        assert_eq!(packed, [67, 0, 1, 2, 5, 6, 7, 8]);
     }
 
     #[test]
     fn ant_fs_host_command_response() {
-        // TODO
+        let packed = AntFsHostCommandResponse::new(12, [0, 1, 2, 3, 4, 5])
+            .pack()
+            .unwrap();
+
+        assert_eq!(packed, [68, 12, 0, 1, 2, 3, 4, 5]);
     }
 
     #[test]
@@ -718,27 +728,58 @@ mod tests {
 
     #[test]
     fn generic_command_page() {
-        // TODO
+        let packed = GenericCommandPage::new(0xAABB, 0xCCDD, 5, 0x1122)
+            .pack()
+            .unwrap();
+
+        assert_eq!(packed, [73, 0xBB, 0xAA, 0xDD, 0xCC, 5, 0x22, 0x11]);
     }
 
     #[test]
     fn open_channel_command() {
-        // TODO
+        let packed = OpenChannelCommand::new(
+            0xFFDDCC.into(),
+            DeviceType::new(80.into(), false),
+            12,
+            0x4455,
+        )
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [74, 0xCC, 0xDD, 0xFF, 80, 12, 0x55, 0x44]);
     }
 
     #[test]
     fn mode_settings_page() {
-        // TODO
+        let packed = ModeSettings::new(SubSportMode::HIIT, SportMode::HIIT)
+            .pack()
+            .unwrap();
+
+        assert_eq!(packed, [76, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 70, 62]);
     }
 
     #[test]
     fn multi_component_system_manufacturers_information() {
-        // TODO
+        let packed = MultiComponentSystemManufacturersInformation::new(
+            ComponentIdentifier::new(1.into(), 0.into()),
+            CommonManufacturersInformation::new(4, 0xBBCC, 0x1122),
+        )
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [78, 0xFF, 0x01, 4, 0xCC, 0xBB, 0x22, 0x11]);
     }
 
     #[test]
     fn multi_component_system_product_information() {
-        // TODO
+        let packed = MultiComponentSystemProductInformation::new(
+            ComponentIdentifier::new(3.into(), 2.into()),
+            CommonProductInformation::new(10, 20, 0x77889900),
+        )
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [79, 0x23, 10, 20, 0, 0x99, 0x88, 0x77]);
     }
 
     #[test]
@@ -797,16 +838,47 @@ mod tests {
 
     #[test]
     fn memory_level() {
-        // TODO
+        let packed = MemoryLevel::new(
+            150,
+            0x3344,
+            TotalSizeUnit::new(BaseUnits::Byte, Units::Kilo),
+        )
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [85, 0xFF, 0xFF, 0xFF, 150, 0x44, 0x33, 0x81]);
     }
 
     #[test]
     fn paired_devices() {
-        // TODO
+        let packed = PairedDevices::new(
+            4,
+            6,
+            ChannelState::new(
+                Paired::Paired,
+                ConnectionState::Searching,
+                NetworkKey::AntPlusManaged,
+            ),
+            0x3344,
+            TransmissionType::new(
+                TransmissionChannelType::IndependentChannel,
+                TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+                0xF.into(),
+            ),
+            DeviceType::new(50.into(), false),
+        )
+        .pack()
+        .unwrap();
+
+        assert_eq!(packed, [86, 4, 6, 0x8A, 0x44, 0x33, 0xF1, 50]);
     }
 
     #[test]
     fn error_description() {
-        // TODO
+        let packed = ErrorDescription::new(0xA.into(), ErrorLevel::Warning, 0xAC, 0x12345678)
+            .pack()
+            .unwrap();
+
+        assert_eq!(packed, [87, 0xFF, 0x4A, 0xAC, 0x78, 0x56, 0x34, 0x12]);
     }
 }
