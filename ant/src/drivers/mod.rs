@@ -87,11 +87,10 @@ fn calculate_checksum(buf: &[u8]) -> u8 {
     buf.iter().fold(0, |acc, x| acc ^ x)
 }
 
-// TODO convert to packing error
-fn create_packed_message<'a, R, W>(
+fn create_packed_message<'a>(
     buf: &'a mut [u8],
     msg: &dyn TransmitableMessage,
-) -> Result<&'a [u8], DriverError<R, W>> {
+) -> Result<&'a [u8], PackingError> {
     let msg_len = msg.serialize_message(&mut buf[HEADER_SIZE..])?;
     let header = TxMessageHeader {
         sync: TxSyncByte::Value,
@@ -220,11 +219,6 @@ mod tests {
         AddChannelIdToList, DeviceType, TransmissionChannelType, TransmissionType,
     };
 
-    #[derive(Debug, PartialEq, Clone, Copy)]
-    enum SerialError {
-        // A,
-    }
-
     #[test]
     fn checksum() {
         let data = [0xA4, 6, 0x59, 2, 0x44, 0x33, 120, 34, 2];
@@ -238,7 +232,7 @@ mod tests {
         transmission_type.device_number_extension = 2.into();
         transmission_type.transmission_channel_type =
             TransmissionChannelType::SharedChannel1ByteAddress;
-        create_packed_message::<SerialError, SerialError>(
+        create_packed_message(
             &mut buf,
             &AddChannelIdToList {
                 channel_number: 2,
