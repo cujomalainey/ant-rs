@@ -57,9 +57,6 @@ fn update_buffer<R, W>(msg: &Result<Option<AntMessage>, DriverError<R, W>>, buf:
     }
 }
 
-// TODO implement SPI driver
-// check for write byte? maybe, not sure 0xA5
-
 impl<SERIAL, SLEEP, R, W> Driver<R, W> for SerialDriver<SERIAL, SLEEP>
 where
     SERIAL: Read<u8, Error = R> + Write<u8, Error = W>,
