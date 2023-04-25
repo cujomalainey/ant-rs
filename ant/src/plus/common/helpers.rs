@@ -10,9 +10,9 @@ use crate::channel::ChannelAssignment;
 use crate::messages::channel::{ChannelEvent, ChannelResponse, MessageCode};
 use crate::messages::config::{
     AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
-    SearchTimeout, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
+    SearchTimeout, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType, UnAssignChannel
 };
-use crate::messages::control::{CloseChannel, OpenChannel};
+use crate::messages::control::{CloseChannel, OpenChannel, RequestMessage, RequestableMessageId};
 use crate::messages::requested_response::{ChannelState, ChannelStatus};
 use crate::messages::{AntMessage, RxMessage, TxMessage};
 use packed_struct::prelude::{packed_bits, Integer};
@@ -23,7 +23,9 @@ enum ConfigureState {
     Id,
     Rf,
     Timeout,
+    UnAssign,
     Done,
+    Unknown,
 }
 
 enum ChannelStateCommand {
@@ -161,6 +163,13 @@ impl MessageHandler {
                     SearchTimeout::new(channel, self.profile_reference.timeout_duration).into(),
                 );
             }
+            ConfigureState::UnAssign => {
+                self.configure_state = ConfigureState::Assign;
+                return Some(UnAssignChannel::new(channel).into());
+            }
+            ConfigureState::Unknown => {
+                return Some(RequestMessage::new(0, RequestableMessageId::ChannelStatus, None).into());
+            }
             ConfigureState::Done => (),
         };
         if let Some(command) = &self.set_channel_state {
@@ -186,6 +195,7 @@ impl MessageHandler {
     }
 
     // TODO add logic to request this on setup
+    // TODO This does not take into account user initited requests and could break state
     fn handle_status(&mut self, msg: &ChannelStatus) {
         match msg.channel_state {
             ChannelState::UnAssigned => self.reset_state(),
@@ -200,7 +210,7 @@ impl MessageHandler {
             MessageCode::ResponseNoError => self.advance_state_machine(true),
             MessageCode::ChannelInWrongState
             | MessageCode::ChannelNotOpened
-            | MessageCode::ChannelIdNotSet => self.reset_state(),
+            | MessageCode::ChannelIdNotSet => panic!("Channel command invalid in this state {:?}", msg.message_code),// self.reset_state(),
             MessageCode::InvalidMessage
             | MessageCode::InvalidNetworkNumber
             | MessageCode::InvalidListId
@@ -226,8 +236,9 @@ impl MessageHandler {
         // TODO copy rest of state
     }
 
-    pub fn open(&mut self) {
+    pub fn open(&mut self, pairing_request: bool) {
         self.set_channel_state = Some(ChannelStateCommand::Open);
+        self.pairing_request = pairing_request;
     }
 
     pub fn close(&mut self) {
@@ -236,7 +247,7 @@ impl MessageHandler {
 
     pub fn set_channel(&mut self, channel: ChannelAssignment) {
         self.channel = channel;
-        self.configure_state = ConfigureState::Assign;
+        self.configure_state = ConfigureState::Unknown;
     }
 
     fn reset_state(&mut self) {
@@ -248,6 +259,8 @@ impl MessageHandler {
     }
 
     fn clean_radio_state(&mut self) {
-        todo!()
+        self.close();
+        // TODO how to send unassign
+        self.configure_state = ConfigureState::UnAssign;
     }
 }
