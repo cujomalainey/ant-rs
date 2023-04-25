@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use ant::drivers::{is_ant_usb_device_from_device, SerialDriver, StubPin, UsbSerial};
+use ant::drivers::{is_ant_usb_device_from_device, UsbDriver};
 use ant::messages::config::SetNetworkKey;
 use ant::plus::profiles::heart_rate::HeartRateDisplay;
 use ant::router::Router;
@@ -43,9 +43,8 @@ fn main() -> std::io::Result<()> {
         devices.remove(selection)
     };
 
-    let usb_driver = UsbSerial::new(device).unwrap();
+    let driver = UsbDriver::new(device).unwrap();
 
-    let driver = SerialDriver::<_, StubPin>::new(usb_driver, None);
     let mut router = Router::new(driver).unwrap();
     let snk = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // Get this from thisisant.com
     router.send(&snk).expect("failed to set network key");

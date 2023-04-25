@@ -25,7 +25,7 @@ use crate::messages::requested_response::{
     SelectiveDataUpdateMaskSetting, SerialNumber, UserNvm,
 };
 use crate::messages::{
-    AntMessage, RxMessage, RxMessageHeader, RxMessageId, TransmitableMessage, TxMessageHeader,
+    AntMessage, RxMessage, RxMessageHeader, RxMessageId, RxSyncByte, TransmitableMessage, TxMessageHeader,
     TxSyncByte, MAX_MESSAGE_DATA_SIZE,
 };
 
@@ -33,6 +33,7 @@ use arrayvec::{ArrayVec, CapacityError};
 use embedded_hal::digital::v2::PinState;
 use packed_struct::prelude::{PackedStructSlice, PackingError};
 use std::array::TryFromSliceError;
+use std::cmp;
 
 pub trait Driver<R, W> {
     fn get_message(&mut self) -> Result<Option<AntMessage>, DriverError<R, W>>;
@@ -87,6 +88,36 @@ fn calculate_checksum(buf: &[u8]) -> u8 {
     buf.iter().fold(0, |acc, x| acc ^ x)
 }
 
+fn align_buffer(buf: &[u8]) -> usize {
+    if !buf.is_empty() {
+        // TODO analyze this, shouldnt we toss the buffer in this case?
+        let msg_start = buf
+            .iter()
+            .position(|&x| x == (RxSyncByte::Write as u8))
+            .unwrap_or(0);
+        return msg_start;
+    }
+    0
+}
+
+fn update_buffer<R, W>(msg: &Result<Option<AntMessage>, DriverError<R, W>>, buf: &[u8]) -> usize {
+    if msg.is_err() {
+        // It was a corrupted message, skip first byte to resposition buf and move on
+        return 1;
+    } else if let Ok(Some(data)) = msg {
+        // This check is simply to make sure we don't panic in the event a message somehow
+        // mis-represented its size and we were able to parse it still correctly. Specificly
+        // the case where len > buf len
+        let amount = cmp::min(
+            (data.header.msg_length as usize) + HEADER_SIZE + CHECKSUM_SIZE,
+            buf.len(),
+        );
+        return amount;
+    }
+    0
+}
+
+
 fn create_packed_message<'a>(
     buf: &'a mut [u8],
     msg: &dyn TransmitableMessage,
@@ -109,7 +140,7 @@ const HEADER_SIZE: usize = 3;
 
 type Buffer = ArrayVec<u8, ANT_MESSAGE_SIZE>;
 
-fn parse_buffer<R, W>(buf: &Buffer) -> Result<Option<AntMessage>, DriverError<R, W>> {
+fn parse_buffer<R, W>(buf: &[u8]) -> Result<Option<AntMessage>, DriverError<R, W>> {
     // Not enough bytes
     if buf.len() < HEADER_SIZE {
         return Ok(None);
@@ -119,9 +150,10 @@ fn parse_buffer<R, W>(buf: &Buffer) -> Result<Option<AntMessage>, DriverError<R,
     let header = RxMessageHeader::unpack_from_slice(&buf[..HEADER_SIZE])?;
     let msg_size = (header.msg_length as usize) + HEADER_SIZE + CHECKSUM_SIZE;
 
-    if buf.capacity() < msg_size {
-        return Err(DriverError::BufferTooSmall(msg_size, buf.capacity()));
-    }
+    // TODO
+    // if buf.capacity() < msg_size {
+    //     return Err(DriverError::BufferTooSmall(msg_size, buf.capacity()));
+    // }
 
     if buf.len() < msg_size {
         return Ok(None);

@@ -7,15 +7,14 @@
 // except according to those terms.
 
 use crate::drivers::{
-    create_packed_message, parse_buffer, Buffer, Driver, DriverError, ANT_MESSAGE_SIZE,
-    CHECKSUM_SIZE, HEADER_SIZE,
+    create_packed_message, parse_buffer, Buffer, Driver, DriverError, align_buffer,ANT_MESSAGE_SIZE,
+    update_buffer
 };
-use crate::messages::{AntMessage, RxSyncByte, TransmitableMessage};
+use crate::messages::{AntMessage, TransmitableMessage};
 use embedded_hal::digital::v2::{OutputPin, PinState};
 use embedded_hal::serial::Read;
 use embedded_hal::serial::Write;
 use nb;
-use std::cmp;
 
 pub struct SerialDriver<SERIAL, PIN> {
     serial: SERIAL,
@@ -41,22 +40,6 @@ where
     }
 }
 
-fn update_buffer<R, W>(msg: &Result<Option<AntMessage>, DriverError<R, W>>, buf: &mut Buffer) {
-    if msg.is_err() {
-        // It was a corrupted message, skip first byte to resposition buf and move on
-        buf.remove(0);
-    } else if let Ok(Some(data)) = msg {
-        // This check is simply to make sure we don't panic in the event a message somehow
-        // mis-represented its size and we were able to parse it still correctly. Specificly
-        // the case where len > buf len
-        let amount = cmp::min(
-            (data.header.msg_length as usize) + HEADER_SIZE + CHECKSUM_SIZE,
-            buf.len(),
-        );
-        buf.drain(..amount);
-    }
-}
-
 impl<SERIAL, SLEEP, R, W> Driver<R, W> for SerialDriver<SERIAL, SLEEP>
 where
     SERIAL: Read<u8, Error = R> + Write<u8, Error = W>,
@@ -64,28 +47,6 @@ where
 {
     fn get_message(&mut self) -> Result<Option<AntMessage>, DriverError<R, W>> {
         let buf = &mut self.buffer;
-
-        // Attempt to parse remaining contents of the buffer before reading
-        // find the start of a message if not a usb driver. USB does bulk transfer with full
-        // message per transfer so this logic does not apply.
-
-        if !buf.is_empty() {
-            // TODO analyze this, shouldnt we toss the buffer in this case?
-            let msg_start = buf
-                .iter()
-                .position(|&x| x == (RxSyncByte::Write as u8))
-                .unwrap_or(0);
-            if msg_start != 0 {
-                buf.drain(msg_start..);
-            }
-        }
-        let msg = parse_buffer(buf);
-
-        update_buffer(&msg, buf);
-
-        if Ok(None) != msg {
-            return msg;
-        }
 
         loop {
             let data = self.serial.read();
@@ -100,9 +61,11 @@ where
             }
         }
 
+        buf.drain(..align_buffer(buf));
+
         let msg_result = parse_buffer(buf);
 
-        update_buffer(&msg_result, buf);
+        buf.drain(..update_buffer(&msg_result, buf));
 
         msg_result
     }
@@ -194,7 +157,10 @@ mod tests {
         type Error = SerialError;
 
         fn read(&mut self) -> Result<u8, nb::Error<SerialError>> {
-            let first = self.in_bytes.get_mut(0).unwrap();
+            let first = match self.in_bytes.get_mut(0) {
+                Some(x) => x,
+                None => return Err(nb::Error::WouldBlock),
+            };
             let data = match first {
                 TestData::Data(d) => Ok(d.remove(0)),
                 TestData::Error(e) => Err(*e),
@@ -255,13 +221,12 @@ mod tests {
         let driver = SerialDriver::<_, StubPin>::new(context, None);
         let mut buf = driver.buffer;
         [2, 3, 4, 5, 6].iter().for_each(|x| buf.push(*x));
-        update_buffer::<SerialError, SerialError>(&Err(DriverError::BadChecksum(0, 0)), &mut buf);
-        assert_eq!(buf.as_slice(), [3, 4, 5, 6]);
+        assert_eq!(1, update_buffer::<SerialError, SerialError>(&Err(DriverError::BadChecksum(0, 0)), &mut buf));
         buf.clear();
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
             .iter()
             .for_each(|x| buf.push(*x));
-        update_buffer::<SerialError, SerialError>(
+        let remove = update_buffer::<SerialError, SerialError>(
             &Ok(Some(AntMessage {
                 header: RxMessageHeader {
                     sync: RxSyncByte::Write,
@@ -278,7 +243,8 @@ mod tests {
             })),
             &mut buf,
         );
-        assert_eq!(buf.as_slice(), []);
+        assert_eq!(remove, 10);
+        buf.clear();
         [2, 3, 4, 5, 6, 7].iter().for_each(|x| buf.push(*x));
         update_buffer::<SerialError, SerialError>(&Ok(None), &mut buf);
         assert_eq!(buf.as_slice(), [2, 3, 4, 5, 6, 7]);

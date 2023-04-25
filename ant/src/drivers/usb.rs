@@ -8,14 +8,16 @@
 
 // MacOS only USB to Serial interface for ANT USB sticks
 // Linux does not need this as the sticks show up as proper serial devices
-use embedded_hal::serial::Read;
-use embedded_hal::serial::Write;
+
+use crate::drivers::{Driver, DriverError, align_buffer, parse_buffer, update_buffer, ANT_MESSAGE_SIZE, create_packed_message};
+use crate::messages::{AntMessage, TransmitableMessage};
 use rusb::{Device, DeviceHandle, Direction, Interface, TransferType, UsbContext};
 use std::cmp::min;
 use std::time::Duration;
 
-// TODO turn this into its own driver reusing common funcs and drop serial
-pub struct UsbSerial<T: UsbContext> {
+pub type UsbDriverError = DriverError<rusb::Error, rusb::Error>;
+
+pub struct UsbDriver<T: UsbContext> {
     handle: DeviceHandle<T>,
     in_address: u8,
     out_address: u8,
@@ -24,6 +26,36 @@ pub struct UsbSerial<T: UsbContext> {
     out_buf: Vec<u8>,
     in_max_packet_size: usize,
     out_max_packet_size: usize,
+}
+
+impl<T: UsbContext> Driver<rusb::Error, rusb::Error> for UsbDriver<T> {
+    fn get_message(&mut self) -> Result<Option<AntMessage>, UsbDriverError> {
+        if let Err(x) = self.read() {
+            return Err(DriverError::ReadError(x));
+        }
+        let buf = &mut self.in_buf;
+
+        buf.drain(..align_buffer(buf));
+        let msg = parse_buffer(buf);
+        buf.drain(..update_buffer(&msg, buf));
+        if Ok(None) != msg {
+            return msg;
+        }
+        Ok(None)
+
+    }
+
+    fn send_message(&mut self, msg: &dyn TransmitableMessage) -> Result<(), UsbDriverError> {
+        let mut buf: [u8; ANT_MESSAGE_SIZE] = [0; ANT_MESSAGE_SIZE];
+        let buf_slice = create_packed_message(&mut buf, msg)?;
+
+        self.out_buf.extend_from_slice(buf_slice);
+
+        if let Err(x) = self.flush() {
+            return Err(DriverError::WriteError(x));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -86,7 +118,7 @@ fn find_endpoint(
     Err(UsbError::CannotFindEndpoint(endpoint_direction))
 }
 
-impl<T: UsbContext> UsbSerial<T> {
+impl<T: UsbContext> UsbDriver<T> {
     pub fn new(device: Device<T>) -> Result<Self, UsbError> {
         let mut handle = match device.open() {
             Ok(h) => h,
@@ -150,39 +182,21 @@ impl<T: UsbContext> UsbSerial<T> {
         self.handle.attach_kernel_driver(self.iface)?;
         Ok(self.handle.device())
     }
-}
 
-impl<T: UsbContext> Read<u8> for UsbSerial<T> {
-    type Error = rusb::Error;
-
-    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+    fn read(&mut self) -> nb::Result<(), rusb::Error> {
         let mut buf = vec![0; self.in_max_packet_size];
-        let timeout = Duration::from_millis(1);
+        const TIMEOUT: Duration = Duration::from_millis(1);
 
-        if self.in_buf.is_empty() {
-            match self.handle.read_bulk(self.in_address, &mut buf, timeout) {
+        loop {
+            match self.handle.read_bulk(self.in_address, &mut buf, TIMEOUT) {
                 Ok(len) => self.in_buf.extend_from_slice(&buf[..len]),
-                Err(rusb::Error::Timeout) => return Err(nb::Error::WouldBlock),
+                Err(rusb::Error::Timeout) => return Ok(()),
                 Err(err) => return Err(nb::Error::Other(err)),
             }
         }
-
-        match self.in_buf.is_empty() {
-            true => Err(nb::Error::WouldBlock),
-            false => Ok(self.in_buf.remove(0)),
-        }
-    }
-}
-
-impl<T: UsbContext> Write<u8> for UsbSerial<T> {
-    type Error = rusb::Error;
-
-    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
-        self.out_buf.push(word);
-        Ok(())
     }
 
-    fn flush(&mut self) -> nb::Result<(), Self::Error> {
+    fn write(&mut self) -> nb::Result<(), rusb::Error> {
         let buf = &self.out_buf[..min(self.out_buf.len(), self.out_max_packet_size)];
         // Shortest timeout possible
         let timeout = Duration::from_millis(1);
@@ -192,7 +206,14 @@ impl<T: UsbContext> Write<u8> for UsbSerial<T> {
             Err(rusb::Error::Timeout) => return Err(nb::Error::WouldBlock),
             Err(io) => return Err(nb::Error::Other(io)),
         };
-        self.out_buf.drain(0..len);
+        self.out_buf.drain(..len);
+        Ok(())
+    }
+
+    fn flush(&mut self) -> nb::Result<(), rusb::Error> {
+        while !self.out_buf.is_empty() {
+            self.write()?;
+        }
         Ok(())
     }
 }
