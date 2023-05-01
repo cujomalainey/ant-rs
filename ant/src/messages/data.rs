@@ -450,7 +450,15 @@ impl AdvancedBurstData {
     }
 
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<Self, PackingError> {
-        let data_bytes = match data[1..].try_into() {
+        // TODO this could be cleaned up
+        let data_bytes = match data
+            .get(1..)
+            .ok_or(PackingError::BufferSizeMismatch {
+                actual: data.len(),
+                expected: 10,
+            })?
+            .try_into()
+        {
             Ok(x) => x,
             Err(_) => return Err(PackingError::SliceIndexingError { slice_len: 1 }),
         };
