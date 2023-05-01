@@ -184,8 +184,13 @@ impl ExtendedInfo {
 
         let data = if flag_byte.rssi_output {
             // Hack to handle https://www.thisisant.com/forum/viewthread/4280/
-            let format =
-                RssiMeasurementType::from_primitive(data[0]).ok_or(PackingError::InvalidValue)?;
+            let format = RssiMeasurementType::from_primitive(*data.get(0).ok_or(
+                PackingError::BufferSizeMismatch {
+                    expected: 1,
+                    actual: 0,
+                },
+            )?)
+            .ok_or(PackingError::InvalidValue)?;
             let slice_size = match format {
                 RssiMeasurementType::Agc => MeasurementValueAgc::PACKING_SIZE,
                 RssiMeasurementType::Dbm => MeasurementValueDbm::PACKING_SIZE,
