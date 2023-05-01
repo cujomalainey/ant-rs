@@ -775,7 +775,10 @@ impl ConfigureAdvancedBurst {
     }
 
     pub(crate) fn unpack_from_slice(buf: &[u8]) -> Result<ConfigureAdvancedBurst, PackingError> {
-        let (data_buf, buf) = buf.split_at(ConfigureAdvancedBurstData::PACKING_SIZE);
+        let data_buf = buf
+            .get(..ConfigureAdvancedBurstData::PACKING_SIZE)
+            .ok_or(PackingError::BufferTooSmall)?;
+        let buf = buf.get(ConfigureAdvancedBurstData::PACKING_SIZE..);
         let data = ConfigureAdvancedBurstData::unpack_from_slice(data_buf)?;
 
         let mut msg = ConfigureAdvancedBurst {
@@ -784,9 +787,10 @@ impl ConfigureAdvancedBurst {
             retry_count_extension: None,
         };
 
-        if buf.is_empty() {
-            return Ok(msg);
-        }
+        let buf = match buf {
+            Some(x) => x,
+            None => return Ok(msg),
+        };
 
         if buf.len() < 2 {
             return Err(PackingError::BufferSizeMismatch {
