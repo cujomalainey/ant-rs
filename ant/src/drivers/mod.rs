@@ -25,8 +25,8 @@ use crate::messages::requested_response::{
     SelectiveDataUpdateMaskSetting, SerialNumber, UserNvm,
 };
 use crate::messages::{
-    AntMessage, RxMessage, RxMessageHeader, RxMessageId, RxSyncByte, TransmitableMessage, TxMessageHeader,
-    TxSyncByte, MAX_MESSAGE_DATA_SIZE,
+    AntMessage, RxMessage, RxMessageHeader, RxMessageId, RxSyncByte, TransmitableMessage,
+    TxMessageHeader, TxSyncByte, MAX_MESSAGE_DATA_SIZE,
 };
 
 use arrayvec::{ArrayVec, CapacityError};
@@ -116,7 +116,6 @@ fn update_buffer<R, W>(msg: &Result<Option<AntMessage>, DriverError<R, W>>, buf:
     }
     0
 }
-
 
 fn create_packed_message<'a>(
     buf: &'a mut [u8],

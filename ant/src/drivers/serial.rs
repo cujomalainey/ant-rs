@@ -7,8 +7,8 @@
 // except according to those terms.
 
 use crate::drivers::{
-    create_packed_message, parse_buffer, Buffer, Driver, DriverError, align_buffer,ANT_MESSAGE_SIZE,
-    update_buffer
+    align_buffer, create_packed_message, parse_buffer, update_buffer, Buffer, Driver, DriverError,
+    ANT_MESSAGE_SIZE,
 };
 use crate::messages::{AntMessage, TransmitableMessage};
 use embedded_hal::digital::v2::{OutputPin, PinState};
@@ -221,7 +221,13 @@ mod tests {
         let driver = SerialDriver::<_, StubPin>::new(context, None);
         let mut buf = driver.buffer;
         [2, 3, 4, 5, 6].iter().for_each(|x| buf.push(*x));
-        assert_eq!(1, update_buffer::<SerialError, SerialError>(&Err(DriverError::BadChecksum(0, 0)), &mut buf));
+        assert_eq!(
+            1,
+            update_buffer::<SerialError, SerialError>(
+                &Err(DriverError::BadChecksum(0, 0)),
+                &mut buf
+            )
+        );
         buf.clear();
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
             .iter()

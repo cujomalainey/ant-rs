@@ -10,7 +10,8 @@ use crate::channel::ChannelAssignment;
 use crate::messages::channel::{ChannelEvent, ChannelResponse, MessageCode};
 use crate::messages::config::{
     AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
-    SearchTimeout, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType, UnAssignChannel
+    SearchTimeout, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
+    UnAssignChannel,
 };
 use crate::messages::control::{CloseChannel, OpenChannel, RequestMessage, RequestableMessageId};
 use crate::messages::requested_response::{ChannelState, ChannelStatus};
@@ -168,7 +169,9 @@ impl MessageHandler {
                 return Some(UnAssignChannel::new(channel).into());
             }
             ConfigureState::Unknown => {
-                return Some(RequestMessage::new(0, RequestableMessageId::ChannelStatus, None).into());
+                return Some(
+                    RequestMessage::new(0, RequestableMessageId::ChannelStatus, None).into(),
+                );
             }
             ConfigureState::Done => (),
         };
@@ -210,7 +213,10 @@ impl MessageHandler {
             MessageCode::ResponseNoError => self.advance_state_machine(true),
             MessageCode::ChannelInWrongState
             | MessageCode::ChannelNotOpened
-            | MessageCode::ChannelIdNotSet => panic!("Channel command invalid in this state {:?}", msg.message_code),// self.reset_state(),
+            | MessageCode::ChannelIdNotSet => panic!(
+                "Channel command invalid in this state {:?}",
+                msg.message_code
+            ), // self.reset_state(),
             MessageCode::InvalidMessage
             | MessageCode::InvalidNetworkNumber
             | MessageCode::InvalidListId

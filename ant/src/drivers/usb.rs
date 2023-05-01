@@ -9,7 +9,10 @@
 // MacOS only USB to Serial interface for ANT USB sticks
 // Linux does not need this as the sticks show up as proper serial devices
 
-use crate::drivers::{Driver, DriverError, align_buffer, parse_buffer, update_buffer, ANT_MESSAGE_SIZE, create_packed_message};
+use crate::drivers::{
+    align_buffer, create_packed_message, parse_buffer, update_buffer, Driver, DriverError,
+    ANT_MESSAGE_SIZE,
+};
 use crate::messages::{AntMessage, TransmitableMessage};
 use rusb::{Device, DeviceHandle, Direction, Interface, TransferType, UsbContext};
 use std::cmp::min;
@@ -42,7 +45,6 @@ impl<T: UsbContext> Driver<rusb::Error, rusb::Error> for UsbDriver<T> {
             return msg;
         }
         Ok(None)
-
     }
 
     fn send_message(&mut self, msg: &dyn TransmitableMessage) -> Result<(), UsbDriverError> {
