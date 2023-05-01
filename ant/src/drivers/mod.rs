@@ -188,7 +188,13 @@ fn parse_buffer<R, W>(buf: &[u8]) -> Result<Option<AntMessage>, DriverError<R, W
         }
 
         RxMessageId::ChannelEvent => {
-            if msg_slice[1] == 1 {
+            let msg_id = *msg_slice.get(ChannelEvent::MSG_ID_INDEX).ok_or(
+                PackingError::BufferSizeMismatch {
+                    expected: 3,
+                    actual: msg_slice.len(),
+                },
+            )?;
+            if msg_id == ChannelEvent::MSG_ID {
                 RxMessage::ChannelEvent(ChannelEvent::unpack_from_slice(msg_slice)?)
             } else {
                 RxMessage::ChannelResponse(ChannelResponse::unpack_from_slice(msg_slice)?)

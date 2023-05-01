@@ -77,6 +77,9 @@ pub struct ChannelEvent {
 }
 
 impl ChannelEvent {
+    pub(crate) const MSG_ID: u8 = 1;
+    pub(crate) const MSG_ID_INDEX: usize = 1;
+
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<Self, PackingError> {
         let payload = ChannelEventPayload::unpack_from_slice(data)?;
 
