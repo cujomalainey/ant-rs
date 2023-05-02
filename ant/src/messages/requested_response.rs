@@ -359,7 +359,11 @@ pub struct UserNvm {
 
 impl UserNvm {
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<UserNvm, PackingError> {
-        let data_bytes = match data[1..].try_into() {
+        let data_bytes = match data
+            .get(1..)
+            .ok_or(PackingError::BufferTooSmall)?
+            .try_into()
+        {
             Ok(x) => x,
             Err(_) => {
                 return Err(PackingError::SliceIndexingError {
@@ -368,7 +372,9 @@ impl UserNvm {
             }
         };
         Ok(UserNvm {
-            header: UserNvmHeader::unpack_from_slice(&data[0..1])?,
+            header: UserNvmHeader::unpack_from_slice(
+                data.get(..1).ok_or(PackingError::BufferTooSmall)?,
+            )?,
             data: data_bytes,
         })
     }
