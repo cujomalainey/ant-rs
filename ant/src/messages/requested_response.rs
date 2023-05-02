@@ -191,7 +191,15 @@ impl Capabilities {
     const MAX_SENSRCORE_CHANNELS_SIZE: usize = 1;
 
     pub(crate) fn unpack_from_slice(data: &[u8]) -> Result<Self, PackingError> {
-        let (base_buf, data) = data.split_at(BaseCapabilities::PACKING_SIZE);
+        let base_buf =
+            data.get(..BaseCapabilities::PACKING_SIZE)
+                .ok_or(PackingError::BufferSizeMismatch {
+                    expected: BaseCapabilities::PACKING_SIZE,
+                    actual: data.len(),
+                })?;
+        let data = data
+            .get(BaseCapabilities::PACKING_SIZE..)
+            .ok_or(PackingError::BufferTooSmall)?;
         let base_capabilities = BaseCapabilities::unpack_from_slice(base_buf)?;
 
         if data.is_empty() {
@@ -204,7 +212,18 @@ impl Capabilities {
             });
         }
 
-        let (adv2_buf, data) = data.split_at(AdvancedOptions2::PACKING_SIZE);
+        let adv2_buf =
+            data.get(..AdvancedOptions2::PACKING_SIZE)
+                .ok_or(PackingError::BufferSizeMismatch {
+                    actual: data.len(),
+                    expected: AdvancedOptions2::PACKING_SIZE,
+                })?;
+        let data =
+            data.get(AdvancedOptions2::PACKING_SIZE..)
+                .ok_or(PackingError::BufferSizeMismatch {
+                    actual: data.len(),
+                    expected: AdvancedOptions2::PACKING_SIZE,
+                })?;
         let advanced_options2 = AdvancedOptions2::unpack_from_slice(adv2_buf)?;
 
         if data.is_empty() {
@@ -217,40 +236,70 @@ impl Capabilities {
             });
         }
 
-        let max_sensrcore_channels = data[0];
-        let data = &data[Self::MAX_SENSRCORE_CHANNELS_SIZE..];
+        let max_sensrcore_channels = data.get(0).ok_or(PackingError::BufferSizeMismatch {
+            actual: data.len(),
+            expected: 1,
+        })?;
+        let data = data.get(Self::MAX_SENSRCORE_CHANNELS_SIZE..).ok_or(
+            PackingError::BufferSizeMismatch {
+                actual: data.len(),
+                expected: 1,
+            },
+        )?;
 
         if data.is_empty() {
             return Ok(Capabilities {
                 base_capabilities,
                 advanced_options2: Some(advanced_options2),
-                max_sensrcore_channels: Some(max_sensrcore_channels),
+                max_sensrcore_channels: Some(*max_sensrcore_channels),
                 advanced_options3: None,
                 advanced_options4: None,
             });
         }
 
-        let (adv3_buf, data) = data.split_at(AdvancedOptions3::PACKING_SIZE);
+        let adv3_buf =
+            data.get(..AdvancedOptions3::PACKING_SIZE)
+                .ok_or(PackingError::BufferSizeMismatch {
+                    actual: data.len(),
+                    expected: AdvancedOptions3::PACKING_SIZE,
+                })?;
+        let data =
+            data.get(AdvancedOptions3::PACKING_SIZE..)
+                .ok_or(PackingError::BufferSizeMismatch {
+                    actual: data.len(),
+                    expected: AdvancedOptions3::PACKING_SIZE,
+                })?;
         let advanced_options3 = AdvancedOptions3::unpack_from_slice(adv3_buf)?;
 
         if data.is_empty() {
             return Ok(Capabilities {
                 base_capabilities,
                 advanced_options2: Some(advanced_options2),
-                max_sensrcore_channels: Some(max_sensrcore_channels),
+                max_sensrcore_channels: Some(*max_sensrcore_channels),
                 advanced_options3: Some(advanced_options3),
                 advanced_options4: None,
             });
         }
 
-        let (adv4_buf, data) = data.split_at(AdvancedOptions4::PACKING_SIZE);
+        let adv4_buf =
+            data.get(..AdvancedOptions4::PACKING_SIZE)
+                .ok_or(PackingError::BufferSizeMismatch {
+                    actual: data.len(),
+                    expected: AdvancedOptions4::PACKING_SIZE,
+                })?;
+        let data =
+            data.get(AdvancedOptions4::PACKING_SIZE..)
+                .ok_or(PackingError::BufferSizeMismatch {
+                    actual: data.len(),
+                    expected: AdvancedOptions4::PACKING_SIZE,
+                })?;
         let advanced_options4 = AdvancedOptions4::unpack_from_slice(adv4_buf)?;
 
         if data.is_empty() {
             return Ok(Capabilities {
                 base_capabilities,
                 advanced_options2: Some(advanced_options2),
-                max_sensrcore_channels: Some(max_sensrcore_channels),
+                max_sensrcore_channels: Some(*max_sensrcore_channels),
                 advanced_options3: Some(advanced_options3),
                 advanced_options4: Some(advanced_options4),
             });
