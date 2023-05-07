@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate afl;
 extern crate ant;
+use ant::drivers::{Driver, SerialDriver};
 use embedded_hal::serial::{Read, Write};
-use ant::drivers::{SerialDriver, Driver};
 
 struct SerialMock {
     data: Vec<u8>,
@@ -34,8 +34,8 @@ fn main() {
         let mut buf = Vec::new();
         buf.extend_from_slice(data);
         let mock = SerialMock { data: buf };
-        let mut driver: SerialDriver<SerialMock, ant::drivers::StubPin> = ant::drivers::SerialDriver::new(mock, None);
+        let mut driver: SerialDriver<SerialMock, ant::drivers::StubPin> =
+            ant::drivers::SerialDriver::new(mock, None);
         while driver.get_message() != Ok(None) {}
     });
 }
-
