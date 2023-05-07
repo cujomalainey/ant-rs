@@ -38,8 +38,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo build --release
-      - run: cargo build --release --no-default-features
+      - run: cargo install afl
+      - run: cargo build --release --workspace --exclude serial-fuzz-target
+      - run: cargo build --release --no-default-features --workspace --exclude serial-fuzz-target
+      - run: cargo afl build --package serial-fuzz-target
       - run: cargo build --example linux_usb --no-default-features --features "alloc std"
       - run: cargo build --example mac_usb
       - run: cargo build --example mac_usb_hr_display
