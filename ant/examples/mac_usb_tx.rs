@@ -46,9 +46,8 @@ fn main() -> std::io::Result<()> {
         devices.remove(selection)
     };
 
-    let usb_driver = UsbSerial::new(device).unwrap();
+    let mut driver = UsbDriver::new(device).unwrap();
 
-    let mut driver = SerialDriver::<_, StubPin>::new(usb_driver, None);
     let assign = AssignChannel::new(0, ChannelType::BidirectionalMaster, 0, None);
     // Skip setting the public key so we use th public channel by default
     let rf = ChannelRfFrequency::new(0, 23);

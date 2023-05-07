@@ -43,9 +43,7 @@ fn main() -> std::io::Result<()> {
         devices.remove(selection)
     };
 
-    let usb_driver = UsbSerial::new(device).unwrap();
-
-    let mut driver = SerialDriver::<_, StubPin>::new(usb_driver, None);
+    let mut driver = UsbDriver::new(device).unwrap();
     let assign = AssignChannel::new(0, ChannelType::BidirectionalSlave, 0, None);
     let key = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // get this
                                                                                        // from
