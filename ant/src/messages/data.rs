@@ -132,7 +132,7 @@ pub struct FlagByte {
     #[packed_field(bits = "5")]
     pub timestamp_output: bool,
     #[packed_field(bits = "0:4")]
-    _reserved: ReservedZeroes<packed_bits::Bits5>,
+    _reserved: ReservedZeroes<packed_bits::Bits<5>>,
 }
 
 impl FlagByte {
@@ -362,9 +362,9 @@ impl AcknowledgedData {
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct ChannelSequence {
     #[packed_field(bits = "7:5")]
-    pub sequence_number: Integer<u8, packed_bits::Bits3>,
+    pub sequence_number: Integer<u8, packed_bits::Bits<3>>,
     #[packed_field(bits = "4:0")]
-    pub channel_number: Integer<u8, packed_bits::Bits5>,
+    pub channel_number: Integer<u8, packed_bits::Bits<5>>,
 }
 
 #[derive(PackedStruct, Copy, Clone, Debug, Default, PartialEq)]

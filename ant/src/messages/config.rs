@@ -45,7 +45,7 @@ pub struct AssignChannelData {
     #[packed_field(bytes = "0")]
     pub channel_number: u8,
     #[packed_field(bits = "12:15")]
-    _reserved: ReservedZeroes<packed_bits::Bits4>,
+    _reserved: ReservedZeroes<packed_bits::Bits<4>>,
     /// Channel type to be configured
     #[packed_field(bits = "8:11", ty = "enum")]
     pub channel_type: ChannelType,
@@ -70,7 +70,7 @@ pub struct ExtendedAssignment {
     #[packed_field(bits = "5")]
     pub async_tx_mode: bool,
     #[packed_field(bits = "6:7")]
-    _reserved: ReservedZeroes<packed_bits::Bits2>,
+    _reserved: ReservedZeroes<packed_bits::Bits<2>>,
 }
 
 /// Represents a Assign Channel message (0x42)
@@ -133,11 +133,11 @@ pub struct TransmissionType {
     pub global_datapages_used: TransmissionGlobalDataPages,
     #[new(default)]
     #[packed_field(bits = "3")]
-    _reserved: ReservedZeroes<packed_bits::Bits1>,
+    _reserved: ReservedZeroes<packed_bits::Bits<1>>,
     // TODO alias this type when https://github.com/hashmismatch/packed_struct.rs/issues/86 is
     // resolved
     #[packed_field(bits = "4:7")]
-    pub device_number_extension: Integer<u8, packed_bits::Bits4>,
+    pub device_number_extension: Integer<u8, packed_bits::Bits<4>>,
 }
 
 impl TransmissionType {
@@ -163,7 +163,7 @@ impl TransmissionType {
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct DeviceType {
     #[packed_field(bits = "0:6")]
-    pub device_type_id: Integer<u8, packed_bits::Bits7>,
+    pub device_type_id: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "7")]
     pub pairing_request: bool,
 }
@@ -305,7 +305,7 @@ impl SetNetworkKey {
 pub struct TransmitPower {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    _reserved: ReservedZeroes<packed_bits::Bits8>,
+    _reserved: ReservedZeroes<packed_bits::Bits<8>>,
     /// Sets TX power for all channels
     ///
     /// Dbm correlation is chip dependent, please chip and ANT messaging documentation
@@ -465,7 +465,7 @@ pub struct SerialNumberSetChannelId {
 pub struct EnableExtRxMessages {
     #[new(default)]
     #[packed_field(bits = "0:14")]
-    _reserved: ReservedZeroes<packed_bits::Bits15>,
+    _reserved: ReservedZeroes<packed_bits::Bits<15>>,
     /// enable extended messages
     #[packed_field(bits = "15")]
     pub enable: bool,
@@ -477,7 +477,7 @@ pub struct EnableExtRxMessages {
 pub struct EnableLed {
     #[new(default)]
     #[packed_field(bits = "0:14")]
-    _reserved: ReservedZeroes<packed_bits::Bits15>,
+    _reserved: ReservedZeroes<packed_bits::Bits<15>>,
     #[packed_field(bits = "15")]
     /// Switch to enable/disable
     pub enable: bool,
@@ -489,7 +489,7 @@ pub struct EnableLed {
 pub struct CrystalEnable {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    _reserved: ReservedZeroes<packed_bits::Bits8>,
+    _reserved: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
 /// Represents a Lib Config message (0x6E)
@@ -498,7 +498,7 @@ pub struct CrystalEnable {
 pub struct LibConfig {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    _reserved0: ReservedZeroes<packed_bits::Bits8>,
+    _reserved0: ReservedZeroes<packed_bits::Bits<8>>,
     #[packed_field(bits = "8")]
     pub enable_channel_id_output: bool,
     #[packed_field(bits = "9")]
@@ -507,7 +507,7 @@ pub struct LibConfig {
     pub enable_rx_timestamp_output: bool,
     #[new(default)]
     #[packed_field(bits = "11:15")]
-    _reserved1: ReservedZeroes<packed_bits::Bits5>,
+    _reserved1: ReservedZeroes<packed_bits::Bits<5>>,
 }
 
 /// Represents a Frequency Agility message (0x70)
@@ -565,7 +565,7 @@ pub enum EventBufferConfig {
 pub struct ConfigureEventBuffer {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    _reserved: ReservedZeroes<packed_bits::Bits8>,
+    _reserved: ReservedZeroes<packed_bits::Bits<8>>,
     /// Defines which events to buffer
     #[packed_field(bytes = "1", ty = "enum")]
     pub config: EventBufferConfig,
@@ -608,7 +608,7 @@ pub struct Set128BitNetworkKey {
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct HighDutySearchData {
     #[packed_field(bits = "0:14")]
-    _reserved: ReservedZeroes<packed_bits::Bits15>,
+    _reserved: ReservedZeroes<packed_bits::Bits<15>>,
     /// bool to turn high duty search on and off
     #[packed_field(bits = "15")]
     pub enable: bool,
@@ -620,7 +620,7 @@ pub struct HighDutySearchData {
 pub struct HighDutySearchSuppressionCycle {
     #[new(default)]
     #[packed_field(bits = "3:7")]
-    _reserved: ReservedZeroes<packed_bits::Bits5>,
+    _reserved: ReservedZeroes<packed_bits::Bits<5>>,
     /// high priority search suppression in increments of 250ms, limit is 5 and is full
     /// suppression, 0 is no suppression
     #[packed_field(bits = "0:2")]
@@ -674,12 +674,12 @@ pub enum AdvancedBurstMaxPacketLength {
 pub struct SupportedFeatures {
     #[new(default)]
     #[packed_field(bits = "0:6")]
-    _reserved: ReservedZeroes<packed_bits::Bits7>,
+    _reserved: ReservedZeroes<packed_bits::Bits<7>>,
     #[packed_field(bits = "7")]
     pub adv_burst_frequency_hop_enabled: bool,
     #[new(default)]
     #[packed_field(bits = "8:23")]
-    _reserved1: ReservedZeroes<packed_bits::Bits16>,
+    _reserved1: ReservedZeroes<packed_bits::Bits<16>>,
 }
 
 /// Represents Configure Advanced Burst required fields
@@ -688,7 +688,7 @@ pub struct SupportedFeatures {
 pub struct ConfigureAdvancedBurstData {
     #[new(default)]
     #[packed_field(bits = "0:14")]
-    _reserved: ReservedZeroes<packed_bits::Bits15>,
+    _reserved: ReservedZeroes<packed_bits::Bits<15>>,
     /// enable/disable advanced burst
     #[packed_field(bits = "15")]
     pub enable: bool,
@@ -714,11 +714,11 @@ pub struct ConfigureAdvancedBurst {
     pub data: ConfigureAdvancedBurstData,
     /// Optional stall count fields
     // TODO why is this no just raw u8 and u16?
-    pub stall_count: Option<Integer<u16, packed_bits::Bits16>>,
+    pub stall_count: Option<Integer<u16, packed_bits::Bits<16>>>,
     /// Optional retry count fields
     ///
     /// Note, to use retry count, you must also use stall count
-    pub retry_count_extension: Option<Integer<u8, packed_bits::Bits8>>,
+    pub retry_count_extension: Option<Integer<u8, packed_bits::Bits<8>>>,
 }
 
 impl ConfigureAdvancedBurst {
@@ -758,8 +758,9 @@ impl ConfigureAdvancedBurst {
         max_packet_length: AdvancedBurstMaxPacketLength,
         required_features: SupportedFeatures,
         optional_features: SupportedFeatures,
-        stall_count: Option<Integer<u16, packed_bits::Bits16>>,
-        retry_count_extension: Option<Integer<u8, packed_bits::Bits8>>,
+        // TODO why is this an integer?
+        stall_count: Option<Integer<u16, packed_bits::Bits<16>>>,
+        retry_count_extension: Option<Integer<u8, packed_bits::Bits<8>>>,
     ) -> Self {
         Self {
             data: ConfigureAdvancedBurstData {
@@ -804,7 +805,7 @@ impl ConfigureAdvancedBurst {
             Ok(x) => x,
             Err(_) => return Err(PackingError::SliceIndexingError { slice_len: 2 }),
         };
-        msg.stall_count = Some(Integer::<u16, packed_bits::Bits16>::from_lsb_bytes(
+        msg.stall_count = Some(Integer::<u16, packed_bits::Bits<16>>::from_lsb_bytes(
             stall_count_bytes,
         )?);
 
@@ -825,7 +826,7 @@ impl ConfigureAdvancedBurst {
             Ok(x) => x,
             Err(_) => return Err(PackingError::SliceIndexingError { slice_len: 1 }),
         };
-        msg.retry_count_extension = Some(Integer::<u8, packed_bits::Bits8>::from_lsb_bytes(
+        msg.retry_count_extension = Some(Integer::<u8, packed_bits::Bits<8>>::from_lsb_bytes(
             retry_count_extension_bytes,
         )?);
 
@@ -840,7 +841,7 @@ impl ConfigureAdvancedBurst {
 pub struct ConfigureEventFilter {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    _reserved0: ReservedZeroes<packed_bits::Bits8>,
+    _reserved0: ReservedZeroes<packed_bits::Bits<8>>,
     /// filter out rx search time out events
     #[packed_field(bits = "15")]
     pub filter_event_rx_search_timeout: bool,
@@ -873,7 +874,7 @@ pub struct ConfigureEventFilter {
     pub filter_event_transfer_tx_start: bool,
     #[new(default)]
     #[packed_field(bits = "16:21")]
-    _reserved1: ReservedZeroes<packed_bits::Bits8>,
+    _reserved1: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
 /// Represents a Configure Selective Data Updates message (0x7A)
@@ -931,7 +932,7 @@ pub struct EnableSingleChannelEncryption {
     /// Per version 5.1 of the spec this field has a range of 0
     #[new(default)]
     #[packed_field(bytes = "2")]
-    pub volatile_key_index: ReservedZeroes<packed_bits::Bits8>,
+    pub volatile_key_index: ReservedZeroes<packed_bits::Bits<8>>,
     /// Master channel rate / slave tracking channel rate
     #[packed_field(bytes = "3")]
     pub decimation_rate: u8,
@@ -943,7 +944,7 @@ pub struct SetEncryptionKey {
     /// Per version 5.1 of the spec this field has a range of 0
     #[new(default)]
     #[packed_field(bytes = "0")]
-    pub volatile_key_index: ReservedZeroes<packed_bits::Bits8>,
+    pub volatile_key_index: ReservedZeroes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "1:16")]
     pub encryption_key: [u8; 16],
 }
@@ -957,7 +958,7 @@ pub struct SetEncryptionInfoEncryptionId {
     // 0 for encryption id
     #[new(default)]
     #[packed_field(bytes = "0")]
-    pub set_parameter: ReservedZeroes<packed_bits::Bits8>,
+    pub set_parameter: ReservedZeroes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "1:4")]
     pub encryption_id: EncryptionId,
 }
@@ -968,10 +969,10 @@ pub struct SetEncryptionInfoUserInformationString {
     // 1 for User Information String
     #[new(default)]
     #[packed_field(bits = "0:6")]
-    pub set_parameter0: ReservedZeroes<packed_bits::Bits7>,
+    pub set_parameter0: ReservedZeroes<packed_bits::Bits<7>>,
     #[new(default)]
     #[packed_field(bits = "7")]
-    pub set_parameter1: ReservedOnes<packed_bits::Bits1>,
+    pub set_parameter1: ReservedOnes<packed_bits::Bits<1>>,
     #[packed_field(bytes = "1:19")]
     pub user_information_string: UserInformationString,
 }
@@ -982,13 +983,13 @@ pub struct SetEncryptionInfoRandomSeed {
     // 2 for Random Number Seed
     #[new(default)]
     #[packed_field(bits = "0:5")]
-    pub set_parameter0: ReservedZeroes<packed_bits::Bits6>,
+    pub set_parameter0: ReservedZeroes<packed_bits::Bits<6>>,
     #[new(default)]
     #[packed_field(bits = "6")]
-    pub set_parameter1: ReservedOnes<packed_bits::Bits1>,
+    pub set_parameter1: ReservedOnes<packed_bits::Bits<1>>,
     #[new(default)]
     #[packed_field(bits = "7")]
-    pub set_parameter2: ReservedZeroes<packed_bits::Bits1>,
+    pub set_parameter2: ReservedZeroes<packed_bits::Bits<1>>,
     #[packed_field(bytes = "1:16")]
     pub random_seed: [u8; 16],
 }
@@ -1007,13 +1008,13 @@ pub struct ChannelSearchSharing {
 pub struct LoadEncryptionKeyFromNvm {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    pub operation: ReservedZeroes<packed_bits::Bits8>,
+    pub operation: ReservedZeroes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "1")]
     pub nvm_key_index: u8,
     // 0 per spec v5.1
     #[new(default)]
     #[packed_field(bytes = "2")]
-    volatile_key_index: ReservedZeroes<packed_bits::Bits8>,
+    volatile_key_index: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
 #[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
@@ -1021,10 +1022,10 @@ pub struct LoadEncryptionKeyFromNvm {
 pub struct StoreEncryptionKeyInNvm {
     #[new(default)]
     #[packed_field(bits = "0:6")]
-    pub operation0: ReservedZeroes<packed_bits::Bits7>,
+    pub operation0: ReservedZeroes<packed_bits::Bits<7>>,
     #[new(default)]
     #[packed_field(bits = "7")]
-    pub operation1: ReservedOnes<packed_bits::Bits1>,
+    pub operation1: ReservedOnes<packed_bits::Bits<1>>,
     #[packed_field(bytes = "1")]
     pub nvm_key_index: u8,
     #[packed_field(bytes = "2:17")]

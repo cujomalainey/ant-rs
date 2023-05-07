@@ -55,9 +55,9 @@ pub struct ChannelEventPayload {
     #[packed_field(bytes = "0")]
     pub channel_number: u8,
     #[packed_field(bits = "8:14")]
-    _reserved0: ReservedZeroes<packed_bits::Bits7>,
+    _reserved0: ReservedZeroes<packed_bits::Bits<7>>,
     #[packed_field(bits = "15")]
-    _reserved1: ReservedOnes<packed_bits::Bits1>,
+    _reserved1: ReservedOnes<packed_bits::Bits<1>>,
     #[packed_field(bytes = "2", ty = "enum")]
     pub message_code: MessageCode,
 }

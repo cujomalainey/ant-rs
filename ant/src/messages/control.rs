@@ -16,7 +16,7 @@ use packed_struct::prelude::*;
 pub struct ResetSystem {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    filler: ReservedZeroes<packed_bits::Bits8>,
+    filler: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
 #[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
@@ -121,7 +121,7 @@ impl TransmitableMessage for OpenRxScanMode {
 pub struct SleepMessage {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    filler: ReservedZeroes<packed_bits::Bits8>,
+    filler: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
 #[cfg(test)]

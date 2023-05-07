@@ -36,7 +36,7 @@ enum ChannelStateCommand {
 
 pub enum TransmissionTypeAssignment {
     Wildcard(),
-    DeviceNumberExtension(Integer<u8, packed_bits::Bits4>),
+    DeviceNumberExtension(Integer<u8, packed_bits::Bits<4>>),
 }
 
 pub struct ProfileReference {

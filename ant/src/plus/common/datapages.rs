@@ -73,7 +73,7 @@ pub struct AntFsHostCommandResponse {
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct RequestedTransmissionResponse {
     #[packed_field(bits = "0:6")]
-    pub number_of_transmissions: Integer<u8, packed_bits::Bits7>,
+    pub number_of_transmissions: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "7")]
     pub use_acknowleged_messages: bool,
 }
@@ -181,7 +181,7 @@ pub struct OpenChannelCommand {
     #[packed_field(bytes = "0")]
     data_page_number: u8,
     #[packed_field(bytes = "1:3")]
-    pub serial_number: Integer<u32, packed_bits::Bits24>,
+    pub serial_number: Integer<u32, packed_bits::Bits<24>>,
     #[packed_field(bytes = "4")]
     pub device_type: DeviceType,
     #[packed_field(bytes = "5")]
@@ -335,7 +335,7 @@ pub struct ModeSettings {
     data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1:5")]
-    _reserved: ReservedOnes<packed_bits::Bits40>,
+    _reserved: ReservedOnes<packed_bits::Bits<40>>,
     #[packed_field(bytes = "6", ty = "enum")]
     pub sub_sport_mode: SubSportMode,
     #[packed_field(bytes = "7", ty = "enum")]
@@ -346,9 +346,9 @@ pub struct ModeSettings {
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct ComponentIdentifier {
     #[packed_field(bits = "0:3")]
-    pub number_of_components: Integer<u8, packed_bits::Bits4>,
+    pub number_of_components: Integer<u8, packed_bits::Bits<4>>,
     #[packed_field(bits = "4:7")]
-    pub component_identifier: Integer<u8, packed_bits::Bits4>,
+    pub component_identifier: Integer<u8, packed_bits::Bits<4>>,
 }
 
 #[derive(PackedStruct, new, Copy, Clone, Debug, Default, PartialEq)]
@@ -370,7 +370,7 @@ pub struct MultiComponentSystemManufacturersInformation {
     data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1")]
-    _reserved: ReservedOnes<packed_bits::Bits8>,
+    _reserved: ReservedOnes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "2")]
     pub component_identifier: ComponentIdentifier,
     #[packed_field(bytes = "3:7")]
@@ -408,7 +408,7 @@ pub struct ManufacturersInformation {
     data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1:2")]
-    _reserved: ReservedOnes<packed_bits::Bits16>,
+    _reserved: ReservedOnes<packed_bits::Bits<16>>,
     #[packed_field(bytes = "3:7")]
     pub commmon_manufacturers_information: CommonManufacturersInformation,
 }
@@ -421,7 +421,7 @@ pub struct ProductInformation {
     pub data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1")]
-    _reserved: ReservedOnes<packed_bits::Bits8>,
+    _reserved: ReservedOnes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "2:7")]
     pub common_product_information: CommonProductInformation,
 }
@@ -444,9 +444,9 @@ pub enum BatteryStatusField {
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct BatteryIdentifier {
     #[packed_field(bits = "0:3")]
-    pub number_of_batteries: Integer<u8, packed_bits::Bits4>,
+    pub number_of_batteries: Integer<u8, packed_bits::Bits<4>>,
     #[packed_field(bits = "4:7")]
-    pub identifier: Integer<u8, packed_bits::Bits4>,
+    pub identifier: Integer<u8, packed_bits::Bits<4>>,
 }
 
 #[derive(PrimitiveEnum_u8, PartialEq, Copy, Clone, Debug)]
@@ -459,7 +459,7 @@ pub enum OperatingTimeResolution {
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct DescriptiveBitField {
     #[packed_field(bits = "0:3")]
-    pub coarse_battery_voltage: Integer<u8, packed_bits::Bits4>,
+    pub coarse_battery_voltage: Integer<u8, packed_bits::Bits<4>>,
     #[packed_field(bits = "4:6", ty = "enum")]
     pub battery_status: BatteryStatusField,
     #[packed_field(bits = "7", ty = "enum")]
@@ -474,11 +474,11 @@ pub struct BatteryStatus {
     data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1")]
-    _reserved: ReservedOnes<packed_bits::Bits8>,
+    _reserved: ReservedOnes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "2")]
     pub battery_identifier: BatteryIdentifier,
     #[packed_field(bytes = "3:5")]
-    pub cumulative_operating_time: Integer<u32, packed_bits::Bits24>,
+    pub cumulative_operating_time: Integer<u32, packed_bits::Bits<24>>,
     #[packed_field(bytes = "6")]
     pub fractional_battery_voltage: u8,
     #[packed_field(bytes = "7")]
@@ -505,7 +505,7 @@ pub struct TimeAndDate {
     data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1")]
-    _reserved: ReservedOnes<packed_bits::Bits8>,
+    _reserved: ReservedOnes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "2")]
     pub seconds: u8,
     #[packed_field(bytes = "3")]
@@ -513,7 +513,7 @@ pub struct TimeAndDate {
     #[packed_field(bytes = "4")]
     pub hours: u8,
     #[packed_field(bits = "43:47")]
-    pub day: Integer<u8, packed_bits::Bits5>,
+    pub day: Integer<u8, packed_bits::Bits<5>>,
     #[packed_field(bits = "40:42", ty = "enum")]
     pub day_of_week: DayOfWeek,
     #[packed_field(bytes = "6")]
@@ -543,7 +543,7 @@ pub struct SubfieldData {
     data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1")]
-    _reserved: ReservedOnes<packed_bits::Bits8>,
+    _reserved: ReservedOnes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "2", ty = "enum")]
     pub subpage_1: Subpage,
     #[packed_field(bytes = "3", ty = "enum")]
@@ -585,7 +585,7 @@ pub struct MemoryLevel {
     data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1:3")]
-    _reserved: ReservedOnes<packed_bits::Bits24>,
+    _reserved: ReservedOnes<packed_bits::Bits<24>>,
     #[packed_field(bytes = "4")]
     pub percent_used: u8,
     #[packed_field(bytes = "5:6")]
@@ -660,12 +660,12 @@ pub struct ErrorDescription {
     data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1")]
-    _reserved0: ReservedOnes<packed_bits::Bits8>,
+    _reserved0: ReservedOnes<packed_bits::Bits<8>>,
     #[packed_field(bits = "20:23")]
-    pub system_component_identifier: Integer<u8, packed_bits::Bits4>,
+    pub system_component_identifier: Integer<u8, packed_bits::Bits<4>>,
     #[new(default)]
     #[packed_field(bits = "18:19")]
-    _reserved1: ReservedZeroes<packed_bits::Bits2>,
+    _reserved1: ReservedZeroes<packed_bits::Bits<2>>,
     #[packed_field(bits = "16:17", ty = "enum")]
     pub error_level: ErrorLevel,
     #[packed_field(bytes = "3")]

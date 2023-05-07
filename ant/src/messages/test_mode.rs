@@ -8,7 +8,7 @@ use packed_struct::prelude::*;
 pub struct CwInit {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    filler: ReservedZeroes<packed_bits::Bits8>,
+    filler: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
 #[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
@@ -16,7 +16,7 @@ pub struct CwInit {
 pub struct CwTest {
     #[new(default)]
     #[packed_field(bytes = "0")]
-    filler: ReservedZeroes<packed_bits::Bits8>,
+    filler: ReservedZeroes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "1")]
     pub transmit_power: u8,
     #[packed_field(bytes = "2")]

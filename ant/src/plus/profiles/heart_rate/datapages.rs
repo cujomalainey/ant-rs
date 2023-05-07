@@ -30,7 +30,7 @@ pub enum DataPageNumbers {
     HRFeatureCommand = 32,
 }
 
-impl From<DataPageNumbers> for Integer<u8, packed_bits::Bits7> {
+impl From<DataPageNumbers> for Integer<u8, packed_bits::Bits<7>> {
     fn from(dp: DataPageNumbers) -> Self {
         dp.to_primitive().into()
     }
@@ -55,12 +55,12 @@ pub struct CommonData {
 pub struct DefaultDataPage {
     #[new(value = "DataPageNumbers::DefaultDataPage.into()")]
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     #[new(default)]
     #[packed_field(bytes = "1:3")]
-    _reserved: ReservedOnes<packed_bits::Bits24>,
+    _reserved: ReservedOnes<packed_bits::Bits<24>>,
     #[packed_field(bytes = "4:7")]
     pub common: CommonData,
 }
@@ -71,11 +71,11 @@ pub struct DefaultDataPage {
 pub struct CumulativeOperatingTime {
     #[new(value = "DataPageNumbers::CumulativeOperatingTime.into()")]
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     #[packed_field(bytes = "1:3")]
-    pub cumulative_operating_time: Integer<u32, packed_bits::Bits24>,
+    pub cumulative_operating_time: Integer<u32, packed_bits::Bits<24>>,
     #[packed_field(bytes = "4:7")]
     pub common: CommonData,
 }
@@ -86,7 +86,7 @@ pub struct CumulativeOperatingTime {
 pub struct ManufacturerInformation {
     #[new(value = "DataPageNumbers::ManufacturerInformation.into()")]
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     #[packed_field(bytes = "1")]
@@ -103,7 +103,7 @@ pub struct ManufacturerInformation {
 pub struct ProductInformation {
     #[new(value = "DataPageNumbers::ProductInformation.into()")]
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     #[packed_field(bytes = "1")]
@@ -122,7 +122,7 @@ pub struct ProductInformation {
 pub struct PreviousHeartBeat {
     #[new(value = "DataPageNumbers::PreviousHeartBeat.into()")]
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     /// Set to [PreviousHeartBeat::MANUFACTURER_SPECIFIC_UNUSED] if you do not use this field
@@ -146,7 +146,7 @@ impl PreviousHeartBeat {
 pub struct SwimIntervalSummary {
     #[new(value = "DataPageNumbers::SwimIntervalSummary.into()")]
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     #[packed_field(bytes = "1")]
@@ -172,7 +172,7 @@ pub struct Features {
     pub gym_mode: bool,
     #[new(default)]
     #[packed_field(bits = "4:5")]
-    _reserved: ReservedZeroes<packed_bits::Bits3>,
+    _reserved: ReservedZeroes<packed_bits::Bits<3>>,
     #[packed_field(bits = "6")]
     pub manufacturer_specific_feature_0: bool,
     #[packed_field(bits = "7")]
@@ -185,12 +185,12 @@ pub struct Features {
 pub struct Capabilities {
     #[new(value = "DataPageNumbers::Capabilities.into()")]
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     #[new(default)]
     #[packed_field(bytes = "1")]
-    _reserved: ReservedOnes<packed_bits::Bits8>,
+    _reserved: ReservedOnes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "2")]
     pub features_supported: Features,
     #[packed_field(bytes = "3")]
@@ -204,12 +204,12 @@ pub struct Capabilities {
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct DescriptiveBitField {
     #[packed_field(bits = "0:3")]
-    pub coarse_battery_voltage: Integer<u8, packed_bits::Bits4>,
+    pub coarse_battery_voltage: Integer<u8, packed_bits::Bits<4>>,
     #[packed_field(bits = "4:6", ty = "enum")]
     pub battery_status: BatteryStatusField,
     #[new(default)]
     #[packed_field(bits = "7")]
-    _reserved: ReservedZeroes<packed_bits::Bits1>,
+    _reserved: ReservedZeroes<packed_bits::Bits<1>>,
 }
 
 /// This struct represents datapage 7 in the heart rate profile.
@@ -218,7 +218,7 @@ pub struct DescriptiveBitField {
 pub struct BatteryStatus {
     #[new(value = "DataPageNumbers::BatteryStatus.into()")]
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     #[packed_field(bytes = "1")]
@@ -243,17 +243,17 @@ pub enum HeartbeatEventType {
 pub struct DeviceInformation {
     #[new(value = "DataPageNumbers::DeviceInformation.into()")]
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     #[new(default)]
     #[packed_field(bits = "8:13")]
-    _reserved0: ReservedOnes<packed_bits::Bits6>,
+    _reserved0: ReservedOnes<packed_bits::Bits<6>>,
     #[packed_field(bits = "14:15", ty = "enum")]
     pub heartbeat_event_type: HeartbeatEventType,
     #[new(default)]
     #[packed_field(bytes = "2:3")]
-    _reserved1: ReservedOnes<packed_bits::Bits16>,
+    _reserved1: ReservedOnes<packed_bits::Bits<16>>,
     #[packed_field(bytes = "4:7")]
     pub common: CommonData,
 }
@@ -263,7 +263,7 @@ pub struct DeviceInformation {
 pub struct ApplyField {
     #[new(default)]
     #[packed_field(bits = "0:6")]
-    _reserved: ReservedOnes<packed_bits::Bits7>,
+    _reserved: ReservedOnes<packed_bits::Bits<7>>,
     #[packed_field(bits = "7")]
     pub gym_mode: bool,
 }
@@ -273,7 +273,7 @@ pub struct ApplyField {
 pub struct FeatureField {
     #[new(default)]
     #[packed_field(bits = "0:6")]
-    _reserved: ReservedZeroes<packed_bits::Bits7>,
+    _reserved: ReservedZeroes<packed_bits::Bits<7>>,
     #[packed_field(bits = "7")]
     pub gym_mode: bool,
 }
@@ -287,7 +287,7 @@ pub struct HRFeatureCommand {
     data_page_number: u8,
     #[new(default)]
     #[packed_field(bytes = "1:5")]
-    _reserved: ReservedOnes<packed_bits::Bits40>,
+    _reserved: ReservedOnes<packed_bits::Bits<40>>,
     #[packed_field(bytes = "6")]
     pub apply: ApplyField,
     #[packed_field(bytes = "7")]
@@ -300,7 +300,7 @@ pub struct HRFeatureCommand {
 #[packed_struct(bit_numbering = "msb0", size_bytes = "8")]
 pub struct ManufacturerSpecific {
     #[packed_field(bits = "1:7")]
-    data_page_number: Integer<u8, packed_bits::Bits7>,
+    data_page_number: Integer<u8, packed_bits::Bits<7>>,
     #[packed_field(bits = "0")]
     pub page_change_toggle: bool,
     #[packed_field(bytes = "1:3")]

@@ -91,18 +91,18 @@ pub struct StandardOptions {
     #[packed_field(bits = "5")]
     pub no_burst_messages: bool,
     #[packed_field(bits = "6:7")]
-    _reserved: ReservedZeroes<packed_bits::Bits2>,
+    _reserved: ReservedZeroes<packed_bits::Bits<2>>,
 }
 
 #[derive(PackedStruct, Copy, Clone, Debug, PartialEq)]
 #[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
 pub struct AdvancedOptions {
     #[packed_field(bits = "0")]
-    _reserved: ReservedZeroes<packed_bits::Bits1>,
+    _reserved: ReservedZeroes<packed_bits::Bits<1>>,
     #[packed_field(bits = "1")]
     pub network_enabled: bool,
     #[packed_field(bits = "2")]
-    _reserved1: ReservedZeroes<packed_bits::Bits1>,
+    _reserved1: ReservedZeroes<packed_bits::Bits<1>>,
     #[packed_field(bits = "3")]
     pub serial_number_enabled: bool,
     #[packed_field(bits = "4")]
@@ -125,7 +125,7 @@ pub struct AdvancedOptions2 {
     #[packed_field(bits = "2")]
     pub scan_mode_enabled: bool,
     #[packed_field(bits = "3")]
-    _reserved: ReservedZeroes<packed_bits::Bits1>,
+    _reserved: ReservedZeroes<packed_bits::Bits<1>>,
     #[packed_field(bits = "4")]
     pub prox_search_enabled: bool,
     #[packed_field(bits = "5")]
@@ -154,7 +154,7 @@ pub struct AdvancedOptions3 {
     #[packed_field(bits = "4")]
     pub search_sharing_enabled: bool,
     #[packed_field(bits = "5")]
-    _reserved: ReservedZeroes<packed_bits::Bits1>,
+    _reserved: ReservedZeroes<packed_bits::Bits<1>>,
     #[packed_field(bits = "6")]
     pub selective_data_updates_enabled: bool,
     #[packed_field(bits = "7")]
@@ -171,7 +171,7 @@ pub struct AdvancedOptions4 {
     #[packed_field(bits = "0")]
     pub rfactive_notification_enabled: bool,
     #[packed_field(bits = "1:7")]
-    _reserved: ReservedZeroes<packed_bits::Bits7>,
+    _reserved: ReservedZeroes<packed_bits::Bits<7>>,
 }
 
 impl AdvancedOptions4 {
@@ -321,7 +321,7 @@ impl Capabilities {
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "5")]
 pub struct AdvancedBurstCapabilities {
     #[packed_field(bytes = "0")]
-    _reserved: ReservedZeroes<packed_bits::Bits8>,
+    _reserved: ReservedZeroes<packed_bits::Bits<8>>,
     #[packed_field(bytes = "1", ty = "enum")]
     pub supported_max_packed_length: AdvancedBurstMaxPacketLength,
     #[packed_field(bytes = "2:4")]
@@ -347,7 +347,7 @@ pub use crate::messages::config::SetSelectiveDataUpdateMask as SelectiveDataUpda
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
 pub struct UserNvmHeader {
     #[packed_field(bytes = "0")]
-    resered: ReservedZeroes<packed_bits::Bits8>,
+    resered: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
 // TODO conditionally compile this, also magic num
