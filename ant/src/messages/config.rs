@@ -713,12 +713,11 @@ pub struct ConfigureAdvancedBurst {
     /// Required Fields
     pub data: ConfigureAdvancedBurstData,
     /// Optional stall count fields
-    // TODO why is this no just raw u8 and u16?
-    pub stall_count: Option<Integer<u16, packed_bits::Bits<16>>>,
+    pub stall_count: Option<u16>,
     /// Optional retry count fields
     ///
     /// Note, to use retry count, you must also use stall count
-    pub retry_count_extension: Option<Integer<u8, packed_bits::Bits<8>>>,
+    pub retry_count_extension: Option<u8>,
 }
 
 impl ConfigureAdvancedBurst {
@@ -734,10 +733,10 @@ impl TransmitableMessage for ConfigureAdvancedBurst {
         if let Some(data) = self.stall_count {
             let (stall_buf, buf) = buf.split_at_mut(ConfigureAdvancedBurst::STALL_COUNT_SIZE);
             len += ConfigureAdvancedBurst::STALL_COUNT_SIZE;
-            stall_buf.copy_from_slice(data.to_lsb_bytes()?.as_slice());
+            stall_buf.copy_from_slice(data.to_lsb_bytes().as_slice());
             let retry_buf = &mut buf[..ConfigureAdvancedBurst::RETRY_COUNT_EXTENSION_SIZE];
             if let Some(retry_count) = self.retry_count_extension {
-                retry_buf.copy_from_slice(retry_count.to_lsb_bytes()?.as_slice());
+                retry_buf.copy_from_slice(retry_count.to_lsb_bytes().as_slice());
                 len += ConfigureAdvancedBurst::RETRY_COUNT_EXTENSION_SIZE;
             }
         } else if self.stall_count.is_none() && self.retry_count_extension.is_some() {
@@ -758,9 +757,8 @@ impl ConfigureAdvancedBurst {
         max_packet_length: AdvancedBurstMaxPacketLength,
         required_features: SupportedFeatures,
         optional_features: SupportedFeatures,
-        // TODO why is this an integer?
-        stall_count: Option<Integer<u16, packed_bits::Bits<16>>>,
-        retry_count_extension: Option<Integer<u8, packed_bits::Bits<8>>>,
+        stall_count: Option<u16>,
+        retry_count_extension: Option<u8>,
     ) -> Self {
         Self {
             data: ConfigureAdvancedBurstData {
@@ -805,9 +803,7 @@ impl ConfigureAdvancedBurst {
             Ok(x) => x,
             Err(_) => return Err(PackingError::SliceIndexingError { slice_len: 2 }),
         };
-        msg.stall_count = Some(Integer::<u16, packed_bits::Bits<16>>::from_lsb_bytes(
-            stall_count_bytes,
-        )?);
+        msg.stall_count = Some(u16::from_lsb_bytes(stall_count_bytes));
 
         if buf.is_empty() {
             return Ok(msg);
@@ -826,9 +822,7 @@ impl ConfigureAdvancedBurst {
             Ok(x) => x,
             Err(_) => return Err(PackingError::SliceIndexingError { slice_len: 1 }),
         };
-        msg.retry_count_extension = Some(Integer::<u8, packed_bits::Bits<8>>::from_lsb_bytes(
-            retry_count_extension_bytes,
-        )?);
+        msg.retry_count_extension = Some(u8::from_lsb_bytes(retry_count_extension_bytes));
 
         Ok(msg)
     }
