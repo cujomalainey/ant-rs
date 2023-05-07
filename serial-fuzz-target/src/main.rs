@@ -21,10 +21,10 @@ impl Write<u8> for SerialMock {
 impl Read<u8> for SerialMock {
     type Error = u8;
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        if self.data.len() > 0 {
-            Ok(self.data.remove(0))
-        } else {
+        if self.data.is_empty() {
             Err(nb::Error::WouldBlock)
+        } else {
+            Ok(self.data.remove(0))
         }
     }
 }

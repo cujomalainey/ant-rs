@@ -236,7 +236,7 @@ impl Capabilities {
             });
         }
 
-        let max_sensrcore_channels = data.get(0).ok_or(PackingError::BufferSizeMismatch {
+        let max_sensrcore_channels = data.first().ok_or(PackingError::BufferSizeMismatch {
             actual: data.len(),
             expected: 1,
         })?;
