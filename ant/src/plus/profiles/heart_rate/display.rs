@@ -7,13 +7,12 @@
 // except according to those terms.
 
 use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
-use crate::messages::config::{TransmissionChannelType, TransmissionGlobalDataPages};
+use crate::messages::config::{ChannelType, TransmissionChannelType, TransmissionGlobalDataPages};
 use crate::messages::data::{AcknowledgedData, BroadcastData};
 use crate::messages::{AntMessage, RxMessage, TxMessage};
 use crate::plus::common::datapages::{ModeSettings, RequestDataPage, MANUFACTURER_SPECIFIC_RANGE};
-use crate::plus::common::helpers::{
-    MessageHandler, MessageHandlerError, ProfileReference, TransmissionTypeAssignment,
-};
+use crate::plus::common::helpers::StateError;
+use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
 use crate::plus::profiles::heart_rate::{
     BatteryStatus, Capabilities, CumulativeOperatingTime, DataPageNumbers, DefaultDataPage,
     DeviceInformation, ManufacturerInformation, ManufacturerSpecific, PreviousHeartBeat,
@@ -49,12 +48,14 @@ pub struct HeartRateDisplay {
     msg_handler: MessageHandler,
     rx_message_callback: Option<fn(&AntMessage)>,
     rx_datapage_callback: Option<fn(Result<RxDataPages, HeartRateError>)>,
+    // TODO check size of tx message, maybe convert to data only message type
+    tx_dp_cache: Option<TxMessage>,
 }
 
 const HR_REFERENCE: ProfileReference = ProfileReference {
-    // TODO type device_type
     device_type: 120,
-    channel_type: TransmissionChannelType::IndependentChannel,
+    channel_type: ChannelType::BidirectionalSlave,
+    transmission_channel_type: TransmissionChannelType::IndependentChannel,
     global_datapages_used: TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
     radio_frequency: NETWORK_RF_FREQUENCY,
     timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
@@ -75,6 +76,7 @@ impl HeartRateDisplay {
                 ant_plus_key_index,
                 &HR_REFERENCE,
             ),
+            tx_dp_cache: None,
         }
     }
 
@@ -154,29 +156,26 @@ impl HeartRateDisplay {
     }
 
     pub fn send_datapage(&mut self, dp: TxDataPages, use_ack: bool) -> Result<(), HeartRateError> {
-        if self.msg_handler.is_pending() {
-            return Err(HeartRateError::PageAlreadyPending());
-        }
         let channel = match self.msg_handler.get_channel() {
             ChannelAssignment::UnAssigned() => return Err(HeartRateError::NotAssociated()),
             ChannelAssignment::Assigned(channel) => channel,
         };
+        if self.tx_dp_cache.is_some() {
+            return Err(HeartRateError::PageAlreadyPending());
+        }
         let data = match dp {
             TxDataPages::RequestDataPage(rd) => {
-                self.msg_handler
-                    .set_sending(AcknowledgedData::new(channel, rd.pack()?).into())?;
+                self.tx_dp_cache = Some(AcknowledgedData::new(channel, rd.pack()?).into());
                 return Ok(());
             }
             TxDataPages::ModeSettings(ms) => ms.pack(),
             TxDataPages::ManufacturerSpecific(ms) => ms.pack(),
         }?;
-        if use_ack {
-            self.msg_handler
-                .set_sending(AcknowledgedData::new(channel, data).into())?;
+        self.tx_dp_cache = if use_ack {
+            Some(AcknowledgedData::new(channel, data).into())
         } else {
-            self.msg_handler
-                .set_sending(BroadcastData::new(channel, data).into())?;
-        }
+            Some(BroadcastData::new(channel, data).into())
+        };
         Ok(())
     }
 }
@@ -191,11 +190,25 @@ impl Channel for HeartRateDisplay {
             RxMessage::AcknowledgedData(msg) => self.handle_dp(&msg.payload.data),
             _ => (),
         }
-        self.msg_handler.receive_message(msg);
+        match self.msg_handler.receive_message(msg) {
+            Ok(_) => (),
+            Err(e) => {
+                if let Some(f) = self.rx_datapage_callback {
+                    f(Err(e.into()));
+                }
+            }
+        }
     }
 
     fn send_message(&mut self) -> Option<TxMessage> {
-        self.msg_handler.send_message()
+        let msg = self.msg_handler.send_message();
+        if msg.is_some() {
+            return msg;
+        }
+        if self.tx_dp_cache.is_some() && self.msg_handler.is_tx_ready() {
+            return self.tx_dp_cache.take();
+        }
+        None
     }
 
     fn set_channel(&mut self, channel: ChannelAssignment) {
@@ -209,7 +222,7 @@ pub enum HeartRateError {
     UnsupportedDataPage(u8),
     PageAlreadyPending(),
     NotAssociated(),
-    HandlerError(MessageHandlerError),
+    ConfigurationError(StateError),
 }
 
 impl From<packed_struct::PackingError> for HeartRateError {
@@ -218,8 +231,8 @@ impl From<packed_struct::PackingError> for HeartRateError {
     }
 }
 
-impl From<MessageHandlerError> for HeartRateError {
-    fn from(err: MessageHandlerError) -> Self {
-        Self::HandlerError(err)
+impl From<StateError> for HeartRateError {
+    fn from(err: StateError) -> Self {
+        Self::ConfigurationError(err)
     }
 }

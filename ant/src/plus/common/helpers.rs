@@ -15,25 +15,257 @@ use crate::messages::config::{
 };
 use crate::messages::control::{CloseChannel, OpenChannel, RequestMessage, RequestableMessageId};
 use crate::messages::requested_response::{ChannelState, ChannelStatus};
-use crate::messages::{AntMessage, RxMessage, TxMessage};
+use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageId};
 use packed_struct::prelude::{packed_bits, Integer};
 
-enum ConfigureState {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ConfigureStateId {
+    UnknownClose,
+    UnknownUnAssign,
     Assign,
     Period,
     Id,
     Rf,
     Timeout,
-    UnAssign,
+    Error,
     Done,
-    Unknown,
+    Identify,
 }
+
+trait ConfigureState {
+    fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState;
+    fn transmit_config(&self, channel: u8, handler: &MessageHandler) -> Option<TxMessage>;
+    fn get_state(&self) -> ConfigureStateId;
+}
+
+struct Assign {}
+impl ConfigureState for Assign {
+    fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState {
+        if response.message_id != TxMessageId::AssignChannel {
+            return self;
+        }
+        if response.message_code == MessageCode::ResponseNoError {
+            return &ID_STATE;
+        }
+        &ERROR_STATE
+    }
+    fn transmit_config(&self, channel: u8, handler: &MessageHandler) -> Option<TxMessage> {
+        Some(
+            AssignChannel::new(
+                channel,
+                handler.state_config.profile_reference.channel_type,
+                handler.state_config.network_key_index,
+                None,
+            )
+            .into(),
+        )
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::Assign
+    }
+}
+const ASSIGN_STATE: Assign = Assign {};
+struct Period {}
+impl ConfigureState for Period {
+    fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState {
+        if response.message_id != TxMessageId::ChannelPeriod {
+            return self;
+        }
+        if response.message_code == MessageCode::ResponseNoError {
+            return &TIMEOUT_STATE;
+        }
+        &ERROR_STATE
+    }
+    fn transmit_config(&self, channel: u8, handler: &MessageHandler) -> Option<TxMessage> {
+        Some(
+            ChannelPeriod::new(
+                channel,
+                handler.state_config.profile_reference.channel_period,
+            )
+            .into(),
+        )
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::Period
+    }
+}
+const PERIOD_STATE: Period = Period {};
+struct Id {}
+impl ConfigureState for Id {
+    fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState {
+        if response.message_id != TxMessageId::ChannelId {
+            return self;
+        }
+        if response.message_code == MessageCode::ResponseNoError {
+            return &RF_STATE;
+        }
+        &ERROR_STATE
+    }
+    fn transmit_config(&self, channel: u8, handler: &MessageHandler) -> Option<TxMessage> {
+        let transmission_type = match handler.transmission_type {
+            TransmissionTypeAssignment::Wildcard() => TransmissionType::new_wildcard(),
+            TransmissionTypeAssignment::DeviceNumberExtension(x) => TransmissionType::new(
+                handler
+                    .state_config
+                    .profile_reference
+                    .transmission_channel_type,
+                handler.state_config.profile_reference.global_datapages_used,
+                x,
+            ),
+        };
+        Some(
+            ChannelId::new(
+                channel,
+                handler.device_number,
+                DeviceType::new(
+                    handler.state_config.profile_reference.device_type.into(),
+                    handler.pairing_request,
+                ),
+                transmission_type,
+            )
+            .into(),
+        )
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::Id
+    }
+}
+const ID_STATE: Id = Id {};
+struct Rf {}
+impl ConfigureState for Rf {
+    fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState {
+        if response.message_id != TxMessageId::ChannelRfFrequency {
+            return self;
+        }
+        if response.message_code == MessageCode::ResponseNoError {
+            return &PERIOD_STATE;
+        }
+        &ERROR_STATE
+    }
+    fn transmit_config(&self, channel: u8, handler: &MessageHandler) -> Option<TxMessage> {
+        Some(
+            ChannelRfFrequency::new(
+                channel,
+                handler.state_config.profile_reference.radio_frequency,
+            )
+            .into(),
+        )
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::Rf
+    }
+}
+const RF_STATE: Rf = Rf {};
+struct Timeout {}
+impl ConfigureState for Timeout {
+    fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState {
+        if response.message_id != TxMessageId::SearchTimeout {
+            return self;
+        }
+        if response.message_code == MessageCode::ResponseNoError {
+            return &DONE_STATE;
+        }
+        &ERROR_STATE
+    }
+    fn transmit_config(&self, channel: u8, handler: &MessageHandler) -> Option<TxMessage> {
+        Some(
+            SearchTimeout::new(
+                channel,
+                handler.state_config.profile_reference.timeout_duration,
+            )
+            .into(),
+        )
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::Timeout
+    }
+}
+const TIMEOUT_STATE: Timeout = Timeout {};
+struct Error {}
+impl ConfigureState for Error {
+    fn handle_response(&self, _response: &ChannelResponse) -> &dyn ConfigureState {
+        self
+    }
+    fn transmit_config(&self, _channel: u8, _handler: &MessageHandler) -> Option<TxMessage> {
+        None
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::Error
+    }
+}
+const ERROR_STATE: Error = Error {};
+struct Done {}
+impl ConfigureState for Done {
+    fn handle_response(&self, _response: &ChannelResponse) -> &dyn ConfigureState {
+        self
+    }
+    fn transmit_config(&self, _channel: u8, _handler: &MessageHandler) -> Option<TxMessage> {
+        None
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::Done
+    }
+}
+const DONE_STATE: Done = Done {};
+struct UnknownClose {}
+impl ConfigureState for UnknownClose {
+    fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState {
+        if response.message_id != TxMessageId::CloseChannel {
+            return self;
+        }
+        &UNKNOWN_UNASSIGN_STATE
+    }
+    fn transmit_config(&self, channel: u8, _handler: &MessageHandler) -> Option<TxMessage> {
+        Some(CloseChannel::new(channel).into())
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::UnknownClose
+    }
+}
+const UNKNOWN_CLOSE_STATE: UnknownClose = UnknownClose {};
+struct UnknownUnAssign {}
+impl ConfigureState for UnknownUnAssign {
+    fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState {
+        if response.message_id != TxMessageId::UnAssignChannel {
+            return self;
+        }
+        &ASSIGN_STATE
+    }
+    fn transmit_config(&self, channel: u8, _handler: &MessageHandler) -> Option<TxMessage> {
+        Some(UnAssignChannel::new(channel).into())
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::UnknownUnAssign
+    }
+}
+const UNKNOWN_UNASSIGN_STATE: UnknownUnAssign = UnknownUnAssign {};
+struct Identify {}
+impl ConfigureState for Identify {
+    fn handle_response(&self, _response: &ChannelResponse) -> &dyn ConfigureState {
+        self
+    }
+    fn transmit_config(&self, channel: u8, _handler: &MessageHandler) -> Option<TxMessage> {
+        Some(RequestMessage::new(channel, RequestableMessageId::ChannelId, None).into())
+    }
+    fn get_state(&self) -> ConfigureStateId {
+        ConfigureStateId::Identify
+    }
+}
+const IDENTIFY_STATE: Identify = Identify {};
+
+#[derive(Clone, Copy, Debug)]
+pub enum ConfigureError {
+    MessageTimeout(), // TODO add duration
+    MessageError(MessageCode),
+}
+
+pub type StateError = (ConfigureStateId, ConfigureError);
 
 enum ChannelStateCommand {
     Open,
     Close,
 }
-
+#[derive(Clone, Copy, Debug)]
 pub enum TransmissionTypeAssignment {
     Wildcard(),
     DeviceNumberExtension(Integer<u8, packed_bits::Bits<4>>),
@@ -41,28 +273,35 @@ pub enum TransmissionTypeAssignment {
 
 pub struct ProfileReference {
     pub device_type: u8,
-    pub channel_type: TransmissionChannelType, // ignoring device number extension
+    pub channel_type: ChannelType,
+    pub transmission_channel_type: TransmissionChannelType, // ignoring device number extension
     pub global_datapages_used: TransmissionGlobalDataPages,
     pub radio_frequency: u8,
     pub timeout_duration: u8,
     pub channel_period: u16,
 }
 
-pub struct MessageHandler {
-    channel: ChannelAssignment,
+/// This struct constains everything constant from the point we passed in from the initialization,
+/// nothing in it should change even if we reset
+struct StateConfig {
     device_number: u16,
     transmission_type: TransmissionTypeAssignment,
     network_key_index: u8,
-    pairing_request: bool,
-    configure_state: ConfigureState,
-    set_channel_state: Option<ChannelStateCommand>,
-    pending_datapage: Option<TxMessage>,
     profile_reference: &'static ProfileReference,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum MessageHandlerError {
-    TxBufferInUse,
+pub struct MessageHandler {
+    channel: ChannelAssignment,
+    // TODO check to see if this bit auto clears on the radio after a connect
+    // TODO handle profiles that wildcard device type
+    pairing_request: bool,
+    configure_state: &'static dyn ConfigureState,
+    configure_pending_response: bool,
+    tx_ready: bool,
+    device_number: u16,
+    transmission_type: TransmissionTypeAssignment,
+    set_channel_state: Option<ChannelStateCommand>,
+    state_config: StateConfig,
 }
 
 impl MessageHandler {
@@ -74,14 +313,19 @@ impl MessageHandler {
     ) -> Self {
         Self {
             channel: ChannelAssignment::UnAssigned(),
+            configure_state: &IDENTIFY_STATE,
+            set_channel_state: None,
+            tx_ready: true,
+            pairing_request: false,
+            configure_pending_response: false,
             device_number,
             transmission_type,
-            network_key_index: ant_plus_key_index,
-            configure_state: ConfigureState::Assign,
-            set_channel_state: None,
-            pending_datapage: None,
-            profile_reference,
-            pairing_request: false,
+            state_config: StateConfig {
+                device_number,
+                transmission_type,
+                network_key_index: ant_plus_key_index,
+                profile_reference,
+            },
         }
     }
 
@@ -89,16 +333,12 @@ impl MessageHandler {
         self.channel
     }
 
-    pub fn is_pending(&self) -> bool {
-        self.pending_datapage.is_some()
-    }
-
-    pub fn set_sending(&mut self, msg: TxMessage) -> Result<(), MessageHandlerError> {
-        if self.pending_datapage.is_some() {
-            return Err(MessageHandlerError::TxBufferInUse);
-        }
-        self.pending_datapage = Some(msg);
-        Ok(())
+    /// Returns true is a TX_EVENT has been recieved since last call.
+    /// Consective calls will return false until another TX_EVENT is recieved.
+    pub fn is_tx_ready(&mut self) -> bool {
+        let ready = self.tx_ready;
+        self.tx_ready = false;
+        ready
     }
 
     pub fn send_message(&mut self) -> Option<TxMessage> {
@@ -106,75 +346,16 @@ impl MessageHandler {
             ChannelAssignment::UnAssigned() => return None,
             ChannelAssignment::Assigned(channel) => channel,
         };
-
-        match self.configure_state {
-            ConfigureState::Assign => {
-                self.configure_state = ConfigureState::Period;
-                return Some(
-                    AssignChannel::new(
-                        channel,
-                        ChannelType::BidirectionalSlave,
-                        self.network_key_index,
-                        None,
-                    )
-                    .into(),
-                );
+        if !self.configure_pending_response {
+            let msg = self.configure_state.transmit_config(channel, self);
+            if msg.is_some() {
+                self.configure_pending_response = true;
+                return msg;
             }
-            ConfigureState::Period => {
-                self.configure_state = ConfigureState::Id;
-                return Some(
-                    ChannelPeriod::new(channel, self.profile_reference.channel_period).into(),
-                );
-            }
-            ConfigureState::Id => {
-                self.configure_state = ConfigureState::Rf;
-                return Some(
-                    ChannelId::new(
-                        channel,
-                        self.device_number,
-                        DeviceType::new(
-                            self.profile_reference.device_type.into(),
-                            self.pairing_request,
-                        ),
-                        match self.transmission_type {
-                            TransmissionTypeAssignment::Wildcard() => {
-                                TransmissionType::new_wildcard()
-                            }
-                            TransmissionTypeAssignment::DeviceNumberExtension(dev) => {
-                                TransmissionType::new(
-                                    self.profile_reference.channel_type,
-                                    self.profile_reference.global_datapages_used,
-                                    dev,
-                                )
-                            }
-                        },
-                    )
-                    .into(),
-                );
-            }
-            ConfigureState::Rf => {
-                self.configure_state = ConfigureState::Timeout;
-                return Some(
-                    ChannelRfFrequency::new(channel, self.profile_reference.radio_frequency).into(),
-                );
-            }
-            ConfigureState::Timeout => {
-                self.configure_state = ConfigureState::Done;
-                return Some(
-                    SearchTimeout::new(channel, self.profile_reference.timeout_duration).into(),
-                );
-            }
-            ConfigureState::UnAssign => {
-                self.configure_state = ConfigureState::Assign;
-                return Some(UnAssignChannel::new(channel).into());
-            }
-            ConfigureState::Unknown => {
-                return Some(
-                    RequestMessage::new(0, RequestableMessageId::ChannelStatus, None).into(),
-                );
-            }
-            ConfigureState::Done => (),
-        };
+        }
+        if self.configure_state.get_state() != ConfigureStateId::Done {
+            return None;
+        }
         if let Some(command) = &self.set_channel_state {
             let msg = match command {
                 ChannelStateCommand::Open => OpenChannel::new(channel).into(),
@@ -183,63 +364,87 @@ impl MessageHandler {
             self.set_channel_state = None;
             return Some(msg);
         };
+        None
         // TODO check if we need to request channel info once bonded
-        self.pending_datapage.take()
     }
 
-    pub fn receive_message(&mut self, msg: &AntMessage) {
+    pub fn receive_message(&mut self, msg: &AntMessage) -> Result<(), StateError> {
         match &msg.message {
             RxMessage::ChannelResponse(msg) => self.handle_response(msg),
             RxMessage::ChannelEvent(msg) => self.handle_event(msg),
             RxMessage::ChannelId(msg) => self.handle_id(msg),
             RxMessage::ChannelStatus(msg) => self.handle_status(msg),
-            _ => (),
+            _ => Ok(()),
         }
     }
 
     // TODO add logic to request this on setup
     // TODO This does not take into account user initited requests and could break state
-    fn handle_status(&mut self, msg: &ChannelStatus) {
+    fn handle_status(&mut self, msg: &ChannelStatus) -> Result<(), StateError> {
+        let state = self.configure_state.get_state();
+        if state == ConfigureStateId::Error || state == ConfigureStateId::UnknownClose {
+            // We don't care about state because we know we are broken or resetting
+            return Ok(());
+        }
         match msg.channel_state {
-            ChannelState::UnAssigned => self.reset_state(),
+            ChannelState::UnAssigned => {
+                if state == ConfigureStateId::Assign || state == ConfigureStateId::UnknownUnAssign {
+                    return Ok(());
+                }
+                self.reset_state(true);
+                Ok(())
+            }
             ChannelState::Assigned | ChannelState::Searching | ChannelState::Tracking => {
-                self.clean_radio_state()
+                match state {
+                    ConfigureStateId::Id
+                    | ConfigureStateId::Period
+                    | ConfigureStateId::Rf
+                    | ConfigureStateId::Timeout
+                    | ConfigureStateId::Done => return Ok(()),
+                    _ => (),
+                }
+                self.reset_state(true);
+                Ok(())
             }
         }
     }
 
-    fn handle_response(&mut self, msg: &ChannelResponse) {
-        match msg.message_code {
-            MessageCode::ResponseNoError => self.advance_state_machine(true),
-            MessageCode::ChannelInWrongState
-            | MessageCode::ChannelNotOpened
-            | MessageCode::ChannelIdNotSet => panic!(
-                "Channel command invalid in this state {:?}",
-                msg.message_code
-            ), // self.reset_state(),
-            MessageCode::InvalidMessage
-            | MessageCode::InvalidNetworkNumber
-            | MessageCode::InvalidListId
-            | MessageCode::InvalidScanTxChannel
-            | MessageCode::InvalidParameterProvided
-            | MessageCode::MesgSerialErrorId => self.advance_state_machine(false),
-            _ => (),
+    fn handle_response(&mut self, msg: &ChannelResponse) -> Result<(), StateError> {
+        let new_state = self.configure_state.handle_response(msg);
+        // TODO add timeout logic here
+        if new_state.get_state() == ConfigureStateId::Error {
+            let err = Err((
+                self.configure_state.get_state(),
+                ConfigureError::MessageError(msg.message_code),
+            ));
+            self.configure_state = new_state;
+            return err;
         }
+        if new_state.get_state() != self.configure_state.get_state() {
+            self.configure_pending_response = false;
+            self.configure_state = new_state;
+        }
+        Ok(())
     }
 
-    fn handle_event(&mut self, msg: &ChannelEvent) {
-        match msg.payload.message_code {
-            // TODO update out state
-            MessageCode::EventChannelClosed => (),
-            MessageCode::EventRxFailGoToSearch => (),
-            _ => (),
+    fn handle_event(&mut self, msg: &ChannelEvent) -> Result<(), StateError> {
+        if msg.payload.message_code == MessageCode::EventTx {
+            self.tx_ready = true
         }
+        Ok(())
     }
 
-    // Request this on connect
-    fn handle_id(&mut self, msg: &ChannelId) {
+    // TODO Request this on connect
+    fn handle_id(&mut self, msg: &ChannelId) -> Result<(), StateError> {
+        if self.configure_state.get_state() == ConfigureStateId::Identify {
+            // TODO handle state identification
+            self.configure_state = &UNKNOWN_CLOSE_STATE;
+            self.configure_pending_response = false;
+            return Ok(());
+        }
         self.device_number = msg.device_number;
         // TODO copy rest of state
+        Ok(())
     }
 
     pub fn open(&mut self, pairing_request: bool) {
@@ -253,20 +458,33 @@ impl MessageHandler {
 
     pub fn set_channel(&mut self, channel: ChannelAssignment) {
         self.channel = channel;
-        self.configure_state = ConfigureState::Unknown;
+        self.configure_state = &IDENTIFY_STATE;
     }
 
-    fn reset_state(&mut self) {
-        todo!()
+    fn reset_state(&mut self, reset_id_data: bool) {
+        self.configure_state = &UNKNOWN_CLOSE_STATE;
+        self.configure_pending_response = false;
+        if reset_id_data {
+            self.device_number = self.state_config.device_number;
+            self.transmission_type = self.state_config.transmission_type;
+        }
     }
+}
 
-    fn advance_state_machine(&mut self, _success: bool) {
-        todo!()
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::channel::duration_to_search_timeout;
+    use core::time::Duration;
+    const TEST_REFERENCE: ProfileReference = ProfileReference {
+        device_type: 5,
+        channel_type: TransmissionChannelType::IndependentChannel,
+        global_datapages_used: TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+        radio_frequency: 25,
+        timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
+        channel_period: 123,
+    };
 
-    fn clean_radio_state(&mut self) {
-        self.close();
-        // TODO how to send unassign
-        self.configure_state = ConfigureState::UnAssign;
-    }
+    #[test]
+    fn inert_start() {}
 }
