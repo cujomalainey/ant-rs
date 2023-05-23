@@ -53,10 +53,14 @@ impl<T: UsbContext> Driver<rusb::Error, rusb::Error> for UsbDriver<T> {
 
         self.out_buf.extend_from_slice(buf_slice);
 
-        if let Err(x) = self.flush() {
-            return Err(DriverError::WriteError(x));
+        loop {
+            match self.flush() {
+                // TODO this is blocking, move to a non-blocking model
+                Err(nb::Error::WouldBlock) => continue,
+                Err(x) => return Err(DriverError::WriteError(x)),
+                Ok(()) => return Ok(()),
+            }
         }
-        Ok(())
     }
 }
 
