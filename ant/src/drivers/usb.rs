@@ -41,10 +41,7 @@ impl<T: UsbContext> Driver<rusb::Error, rusb::Error> for UsbDriver<T> {
         buf.drain(..align_buffer(buf));
         let msg = parse_buffer(buf);
         buf.drain(..update_buffer(&msg, buf));
-        if Ok(None) != msg {
-            return msg;
-        }
-        Ok(None)
+        msg
     }
 
     fn send_message(&mut self, msg: &dyn TransmitableMessage) -> Result<(), UsbDriverError> {
