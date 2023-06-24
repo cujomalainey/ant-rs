@@ -251,7 +251,6 @@ impl ConfigureState for Identify {
         ConfigureStateId::Identify
     }
 }
-const IDENTIFY_STATE: Identify = Identify {};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ConfigureError {
@@ -313,7 +312,7 @@ impl MessageHandler {
     ) -> Self {
         Self {
             channel: ChannelAssignment::UnAssigned(),
-            configure_state: &IDENTIFY_STATE,
+            configure_state: &UNKNOWN_CLOSE_STATE,
             set_channel_state: None,
             tx_ready: true,
             pairing_request: false,
@@ -458,7 +457,7 @@ impl MessageHandler {
 
     pub fn set_channel(&mut self, channel: ChannelAssignment) {
         self.channel = channel;
-        self.configure_state = &IDENTIFY_STATE;
+        self.configure_state = &UNKNOWN_CLOSE_STATE;
     }
 
     fn reset_state(&mut self, reset_id_data: bool) {
