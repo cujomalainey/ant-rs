@@ -478,8 +478,9 @@ mod tests {
     use core::time::Duration;
     const TEST_REFERENCE: ProfileReference = ProfileReference {
         device_type: 5,
-        channel_type: TransmissionChannelType::IndependentChannel,
+        transmission_channel_type: TransmissionChannelType::IndependentChannel,
         global_datapages_used: TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+        channel_type: ChannelType::BidirectionalSlave,
         radio_frequency: 25,
         timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
         channel_period: 123,
