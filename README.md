@@ -1,3 +1,6 @@
+# Still under initial development
+see `development` branch for latest version until initial release is complete
+
 # ant-rs
 A general purpose ANT* crate for rust
 
