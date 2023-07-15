@@ -190,6 +190,7 @@ impl TransmitableMessage for TxMessage {
             TxMessage::CwTest(ct) => ct.serialize_message(buf),
         }
     }
+
     fn get_tx_msg_id(&self) -> TxMessageId {
         match self {
             TxMessage::UnAssignChannel(uc) => uc.get_tx_msg_id(),
@@ -231,12 +232,12 @@ impl TransmitableMessage for TxMessage {
             TxMessage::ChannelSearchSharing(cs) => cs.get_tx_msg_id(),
             TxMessage::LoadEncryptionKeyFromNvm(le) => le.get_tx_msg_id(),
             TxMessage::StoreEncryptionKeyInNvm(se) => se.get_tx_msg_id(),
-            // SetUsbDescriptorString(SetUsbDescriptorString),
+            // TODO SetUsbDescriptorString(SetUsbDescriptorString),
             TxMessage::ResetSystem(rs) => rs.get_tx_msg_id(),
             TxMessage::OpenChannel(oc) => oc.get_tx_msg_id(),
             TxMessage::CloseChannel(cc) => cc.get_tx_msg_id(),
             TxMessage::RequestMessage(rm) => rm.get_tx_msg_id(),
-            // TxMessage::OpenRxScanMode(or) => or.serialize_message(buf),
+            // TODO TxMessage::OpenRxScanMode(or) => or.serialize_message(buf),
             TxMessage::SleepMessage(sm) => sm.get_tx_msg_id(),
             TxMessage::BroadcastData(bd) => bd.get_tx_msg_id(),
             TxMessage::AcknowledgedData(ad) => ad.get_tx_msg_id(),
@@ -244,6 +245,126 @@ impl TransmitableMessage for TxMessage {
             TxMessage::AdvancedBurstData(ab) => ab.get_tx_msg_id(),
             TxMessage::CwInit(ci) => ci.get_tx_msg_id(),
             TxMessage::CwTest(ct) => ct.get_tx_msg_id(),
+        }
+    }
+}
+
+pub enum TxMessageData {
+    BroadcastData(BroadcastData),
+    AcknowledgedData(AcknowledgedData),
+    BurstTransferData(BurstTransferData),
+    AdvancedBurstData(AdvancedBurstData),
+}
+
+impl TxMessageData {
+    /// Helper for profiles to set channel if relevant on external Tx requests
+    pub(crate) fn set_channel(&mut self, channel: u8) {
+        match self {
+            TxMessageData::BroadcastData(bd) => bd.payload.channel_number = channel,
+            TxMessageData::AcknowledgedData(ad) => ad.payload.channel_number = channel,
+            TxMessageData::BurstTransferData(bt) => {
+                bt.payload.channel_sequence.channel_number = channel.into()
+            }
+            TxMessageData::AdvancedBurstData(ab) => {
+                ab.channel_sequence.channel_number = channel.into()
+            }
+        }
+    }
+}
+
+impl From<TxMessageData> for TxMessage {
+    fn from(msg: TxMessageData) -> TxMessage {
+        match msg {
+            TxMessageData::BroadcastData(bd) => bd.into(),
+            TxMessageData::AcknowledgedData(ad) => ad.into(),
+            TxMessageData::BurstTransferData(bt) => bt.into(),
+            TxMessageData::AdvancedBurstData(ab) => ab.into(),
+        }
+    }
+}
+
+pub enum TxMessageChannelConfig {
+    UnAssignChannel(UnAssignChannel),
+    AssignChannel(AssignChannel),
+    ChannelId(ChannelId),
+    ChannelPeriod(ChannelPeriod),
+    SearchTimeout(SearchTimeout),
+    ChannelRfFrequency(ChannelRfFrequency),
+    SearchWaveform(SearchWaveform),
+    AddChannelIdToList(AddChannelIdToList),
+    AddEncryptionIdToList(AddEncryptionIdToList),
+    ConfigIdList(ConfigIdList),
+    ConfigEncryptionIdList(ConfigEncryptionIdList),
+    SetChannelTransmitPower(SetChannelTransmitPower),
+    LowPrioritySearchTimeout(LowPrioritySearchTimeout),
+    SerialNumberSetChannelId(SerialNumberSetChannelId),
+    FrequencyAgility(FrequencyAgility),
+    ProximitySearch(ProximitySearch),
+    ChannelSearchPriority(ChannelSearchPriority),
+    ConfigureSelectiveDataUpdates(ConfigureSelectiveDataUpdates),
+    EnableSingleChannelEncryption(EnableSingleChannelEncryption),
+    ChannelSearchSharing(ChannelSearchSharing),
+    // Skip Open / Close as user should use API for that
+    RequestMessage(RequestMessage),
+}
+
+impl TxMessageChannelConfig {
+    /// Helper for profiles to set channel if relevant on external Tx requests
+    pub(crate) fn set_channel(&mut self, channel: u8) {
+        match self {
+            TxMessageChannelConfig::UnAssignChannel(uc) => uc.channel_number = channel,
+            TxMessageChannelConfig::AssignChannel(ac) => ac.data.channel_number = channel,
+            TxMessageChannelConfig::ChannelId(id) => id.channel_number = channel,
+            TxMessageChannelConfig::ChannelPeriod(cp) => cp.channel_number = channel,
+            TxMessageChannelConfig::SearchTimeout(st) => st.channel_number = channel,
+            TxMessageChannelConfig::ChannelRfFrequency(cr) => cr.channel_number = channel,
+            TxMessageChannelConfig::SearchWaveform(sw) => sw.channel_number = channel,
+            TxMessageChannelConfig::AddChannelIdToList(ac) => ac.channel_number = channel,
+            TxMessageChannelConfig::AddEncryptionIdToList(ae) => ae.channel_number = channel,
+            TxMessageChannelConfig::ConfigIdList(cl) => cl.channel_number = channel,
+            TxMessageChannelConfig::ConfigEncryptionIdList(ce) => ce.channel_number = channel,
+            TxMessageChannelConfig::SetChannelTransmitPower(sc) => sc.channel_number = channel,
+            TxMessageChannelConfig::LowPrioritySearchTimeout(lp) => lp.channel_number = channel,
+            TxMessageChannelConfig::SerialNumberSetChannelId(sn) => sn.channel_number = channel,
+            TxMessageChannelConfig::FrequencyAgility(fa) => fa.channel_number = channel,
+            TxMessageChannelConfig::ProximitySearch(ps) => ps.channel_number = channel,
+            TxMessageChannelConfig::ChannelSearchPriority(cs) => cs.channel_number = channel,
+            TxMessageChannelConfig::ConfigureSelectiveDataUpdates(cs) => {
+                cs.channel_number = channel
+            }
+            TxMessageChannelConfig::EnableSingleChannelEncryption(es) => {
+                es.channel_number = channel
+            }
+            TxMessageChannelConfig::ChannelSearchSharing(cs) => cs.channel_number = channel,
+            TxMessageChannelConfig::RequestMessage(rm) => rm.data.channel = channel,
+        }
+    }
+}
+
+impl From<TxMessageChannelConfig> for TxMessage {
+    fn from(msg: TxMessageChannelConfig) -> TxMessage {
+        match msg {
+            TxMessageChannelConfig::UnAssignChannel(uc) => uc.into(),
+            TxMessageChannelConfig::AssignChannel(ac) => ac.into(),
+            TxMessageChannelConfig::ChannelId(id) => id.into(),
+            TxMessageChannelConfig::ChannelPeriod(cp) => cp.into(),
+            TxMessageChannelConfig::SearchTimeout(st) => st.into(),
+            TxMessageChannelConfig::ChannelRfFrequency(cr) => cr.into(),
+            TxMessageChannelConfig::SearchWaveform(sw) => sw.into(),
+            TxMessageChannelConfig::AddChannelIdToList(ac) => ac.into(),
+            TxMessageChannelConfig::AddEncryptionIdToList(ae) => ae.into(),
+            TxMessageChannelConfig::ConfigIdList(cl) => cl.into(),
+            TxMessageChannelConfig::ConfigEncryptionIdList(ce) => ce.into(),
+            TxMessageChannelConfig::SetChannelTransmitPower(sc) => sc.into(),
+            TxMessageChannelConfig::LowPrioritySearchTimeout(lp) => lp.into(),
+            TxMessageChannelConfig::SerialNumberSetChannelId(sn) => sn.into(),
+            TxMessageChannelConfig::FrequencyAgility(fa) => fa.into(),
+            TxMessageChannelConfig::ProximitySearch(ps) => ps.into(),
+            TxMessageChannelConfig::ChannelSearchPriority(cs) => cs.into(),
+            TxMessageChannelConfig::ConfigureSelectiveDataUpdates(cs) => cs.into(),
+            TxMessageChannelConfig::EnableSingleChannelEncryption(es) => es.into(),
+            TxMessageChannelConfig::ChannelSearchSharing(cs) => cs.into(),
+            TxMessageChannelConfig::RequestMessage(rm) => rm.into(),
         }
     }
 }

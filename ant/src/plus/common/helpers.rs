@@ -332,19 +332,23 @@ impl MessageHandler {
         self.channel
     }
 
-    /// Returns true is a TX_EVENT has been recieved since last call.
-    /// Consective calls will return false until another TX_EVENT is recieved.
-    pub fn is_tx_ready(&mut self) -> bool {
-        let ready = self.tx_ready;
+    /// Returns true if a TX_EVENT has been recieved since last call.
+    pub fn is_tx_ready(&self) -> bool {
+        self.tx_ready
+    }
+
+    pub fn tx_sent(&mut self) {
         self.tx_ready = false;
-        ready
     }
 
     pub fn send_message(&mut self) -> Option<TxMessage> {
+        // Skip if we are not assigned
         let channel = match self.channel {
             ChannelAssignment::UnAssigned() => return None,
             ChannelAssignment::Assigned(channel) => channel,
         };
+
+        // Walk through configure state machine
         if !self.configure_pending_response {
             let msg = self.configure_state.transmit_config(channel, self);
             if msg.is_some() {
@@ -352,9 +356,13 @@ impl MessageHandler {
                 return msg;
             }
         }
+
+        // Block all data and runtime config until we complete config
         if self.configure_state.get_state() != ConfigureStateId::Done {
             return None;
         }
+
+        // Handle channel open close command
         if let Some(command) = &self.set_channel_state {
             let msg = match command {
                 ChannelStateCommand::Open => OpenChannel::new(channel).into(),
@@ -363,8 +371,8 @@ impl MessageHandler {
             self.set_channel_state = None;
             return Some(msg);
         };
-        None
         // TODO check if we need to request channel info once bonded
+        None
     }
 
     pub fn receive_message(&mut self, msg: &AntMessage) -> Result<(), StateError> {
@@ -427,8 +435,10 @@ impl MessageHandler {
     }
 
     fn handle_event(&mut self, msg: &ChannelEvent) -> Result<(), StateError> {
-        if msg.payload.message_code == MessageCode::EventTx {
-            self.tx_ready = true
+        // TODO check how collisions and TransfersFailed should be handled here
+        match msg.payload.message_code {
+            MessageCode::EventTx | MessageCode::EventTransferTxCompleted => self.tx_ready = true,
+            _ => (),
         }
         Ok(())
     }

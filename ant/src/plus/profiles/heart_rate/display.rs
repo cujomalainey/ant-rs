@@ -8,8 +8,7 @@
 
 use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
 use crate::messages::config::{ChannelType, TransmissionChannelType, TransmissionGlobalDataPages};
-use crate::messages::data::{AcknowledgedData, BroadcastData};
-use crate::messages::{AntMessage, RxMessage, TxMessage};
+use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig, TxMessageData};
 use crate::plus::common::datapages::{ModeSettings, RequestDataPage, MANUFACTURER_SPECIFIC_RANGE};
 use crate::plus::common::helpers::StateError;
 use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
@@ -48,8 +47,8 @@ pub struct HeartRateDisplay {
     msg_handler: MessageHandler,
     rx_message_callback: Option<fn(&AntMessage)>,
     rx_datapage_callback: Option<fn(Result<RxDataPages, HeartRateError>)>,
-    // TODO check size of tx message, maybe convert to data only message type
-    tx_dp_cache: Option<TxMessage>,
+    tx_message_callback: Option<fn() -> Option<TxMessageChannelConfig>>,
+    tx_datapage_callback: Option<fn() -> Option<TxMessageData>>,
 }
 
 const HR_REFERENCE: ProfileReference = ProfileReference {
@@ -70,13 +69,14 @@ impl HeartRateDisplay {
         Self {
             rx_message_callback: None,
             rx_datapage_callback: None,
+            tx_message_callback: None,
+            tx_datapage_callback: None,
             msg_handler: MessageHandler::new(
                 device_number,
                 transmission_type,
                 ant_plus_key_index,
                 &HR_REFERENCE,
             ),
-            tx_dp_cache: None,
         }
     }
 
@@ -154,30 +154,6 @@ impl HeartRateDisplay {
         }
         Err(HeartRateError::UnsupportedDataPage(dp_num))
     }
-
-    pub fn send_datapage(&mut self, dp: TxDataPages, use_ack: bool) -> Result<(), HeartRateError> {
-        let channel = match self.msg_handler.get_channel() {
-            ChannelAssignment::UnAssigned() => return Err(HeartRateError::NotAssociated()),
-            ChannelAssignment::Assigned(channel) => channel,
-        };
-        if self.tx_dp_cache.is_some() {
-            return Err(HeartRateError::PageAlreadyPending());
-        }
-        let data = match dp {
-            TxDataPages::RequestDataPage(rd) => {
-                self.tx_dp_cache = Some(AcknowledgedData::new(channel, rd.pack()?).into());
-                return Ok(());
-            }
-            TxDataPages::ModeSettings(ms) => ms.pack(),
-            TxDataPages::ManufacturerSpecific(ms) => ms.pack(),
-        }?;
-        self.tx_dp_cache = if use_ack {
-            Some(AcknowledgedData::new(channel, data).into())
-        } else {
-            Some(BroadcastData::new(channel, data).into())
-        };
-        Ok(())
-    }
 }
 
 impl Channel for HeartRateDisplay {
@@ -205,8 +181,25 @@ impl Channel for HeartRateDisplay {
         if msg.is_some() {
             return msg;
         }
-        if self.tx_dp_cache.is_some() && self.msg_handler.is_tx_ready() {
-            return self.tx_dp_cache.take();
+        let channel = if let ChannelAssignment::Assigned(channel) = self.msg_handler.get_channel() {
+            channel
+        } else {
+            return None;
+        };
+        if let Some(callback) = self.tx_message_callback {
+            if let Some(mut msg) = callback() {
+                msg.set_channel(channel);
+                return Some(msg.into());
+            }
+        }
+        if self.msg_handler.is_tx_ready() {
+            if let Some(callback) = self.tx_datapage_callback {
+                if let Some(mut msg) = callback() {
+                    msg.set_channel(channel);
+                    self.msg_handler.tx_sent();
+                    return Some(msg.into());
+                }
+            }
         }
         None
     }
