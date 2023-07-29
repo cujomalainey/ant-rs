@@ -38,6 +38,20 @@ trait ConfigureState {
     fn get_state(&self) -> ConfigureStateId;
 }
 
+fn transmission_type_from_state(handler: &MessageHandler) -> TransmissionType {
+    match handler.transmission_type {
+        TransmissionTypeAssignment::Wildcard() => TransmissionType::new_wildcard(),
+        TransmissionTypeAssignment::DeviceNumberExtension(x) => TransmissionType::new(
+            handler
+                .state_config
+                .profile_reference
+                .transmission_channel_type,
+            handler.state_config.profile_reference.global_datapages_used,
+            x,
+        ),
+    }
+}
+
 struct Assign {}
 impl ConfigureState for Assign {
     fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState {
@@ -102,26 +116,18 @@ impl ConfigureState for Id {
         &ERROR_STATE
     }
     fn transmit_config(&self, channel: u8, handler: &MessageHandler) -> Option<TxMessage> {
-        let transmission_type = match handler.transmission_type {
-            TransmissionTypeAssignment::Wildcard() => TransmissionType::new_wildcard(),
-            TransmissionTypeAssignment::DeviceNumberExtension(x) => TransmissionType::new(
-                handler
-                    .state_config
-                    .profile_reference
-                    .transmission_channel_type,
-                handler.state_config.profile_reference.global_datapages_used,
-                x,
-            ),
-        };
         Some(
             ChannelId::new(
                 channel,
                 handler.device_number,
                 DeviceType::new(
                     handler.state_config.profile_reference.device_type.into(),
-                    handler.pairing_request,
+                    matches!(
+                        handler.pairing_request,
+                        DevicePairingState::PendingSet | DevicePairingState::BitSet
+                    ),
                 ),
-                transmission_type,
+                transmission_type_from_state(handler),
             )
             .into(),
         )
@@ -256,9 +262,21 @@ impl ConfigureState for Identify {
 pub enum ConfigureError {
     MessageTimeout(), // TODO add duration
     MessageError(MessageCode),
+    ChannelInWrongState {
+        current: ChannelState,
+        expected: ChannelState,
+    },
 }
 
 pub type StateError = (ConfigureStateId, ConfigureError);
+
+#[derive(PartialEq)]
+enum DevicePairingState {
+    PendingSet,
+    BitSet,
+    PendingClear,
+    BitCleared,
+}
 
 enum ChannelStateCommand {
     Open,
@@ -293,14 +311,27 @@ pub struct MessageHandler {
     channel: ChannelAssignment,
     // TODO check to see if this bit auto clears on the radio after a connect
     // TODO handle profiles that wildcard device type
-    pairing_request: bool,
+    /// Are we setting the pairing bit?
+    pairing_request: DevicePairingState,
+    /// Configuration state machine pointer
     configure_state: &'static dyn ConfigureState,
+    /// State machine confgi message pending response
     configure_pending_response: bool,
+    /// Previous TX transmission sent, ready for new message
     tx_ready: bool,
+    /// Device number
+    /// For master's this is their ID
+    /// For slaves this is the masters' ID
     device_number: u16,
+    /// Transmisison type of the channel
     transmission_type: TransmissionTypeAssignment,
+    /// Pending command to open/close the channel
     set_channel_state: Option<ChannelStateCommand>,
+    /// Original passed in arguements. This is used to differentiate in slaves from wildcarded
+    /// fields versus discovered data
     state_config: StateConfig,
+    /// Last state of the channel we were aware of
+    channel_state: ChannelState,
 }
 
 impl MessageHandler {
@@ -315,8 +346,9 @@ impl MessageHandler {
             configure_state: &UNKNOWN_CLOSE_STATE,
             set_channel_state: None,
             tx_ready: true,
-            pairing_request: false,
+            pairing_request: DevicePairingState::BitCleared,
             configure_pending_response: false,
+            channel_state: ChannelState::UnAssigned,
             device_number,
             transmission_type,
             state_config: StateConfig {
@@ -360,6 +392,32 @@ impl MessageHandler {
         // Block all data and runtime config until we complete config
         if self.configure_state.get_state() != ConfigureStateId::Done {
             return None;
+        }
+
+        if matches!(
+            self.pairing_request,
+            DevicePairingState::PendingSet | DevicePairingState::PendingClear
+        ) {
+            let bit_state = self.pairing_request == DevicePairingState::PendingSet;
+            match self.pairing_request {
+                DevicePairingState::PendingSet => self.pairing_request = DevicePairingState::BitSet,
+                DevicePairingState::PendingClear => {
+                    self.pairing_request = DevicePairingState::BitCleared
+                }
+                _ => (),
+            }
+            return Some(
+                ChannelId::new(
+                    channel,
+                    self.state_config.device_number,
+                    DeviceType::new(
+                        self.state_config.profile_reference.device_type.into(),
+                        bit_state,
+                    ),
+                    transmission_type_from_state(self),
+                )
+                .into(),
+            );
         }
 
         // Handle channel open close command
@@ -456,9 +514,35 @@ impl MessageHandler {
         Ok(())
     }
 
-    pub fn open(&mut self, pairing_request: bool) {
+    /// Set pairing bit
+    /// For slaves this must be done while the channel is closed but will be auto cleared on bond
+    ///
+    /// For masters this can be done while the channel is open or closed but must be manually
+    /// cleared
+    pub fn set_pairing_bit(&mut self, state: bool) -> Result<(), ConfigureError> {
+        if matches!(
+            self.state_config.profile_reference.channel_type,
+            ChannelType::BidirectionalSlave
+                | ChannelType::SharedBidirectionalSlave
+                | ChannelType::SharedReceiveOnly
+        ) && matches!(
+            self.channel_state,
+            ChannelState::Searching | ChannelState::Tracking
+        ) {
+            return Err(ConfigureError::ChannelInWrongState {
+                current: self.channel_state,
+                expected: ChannelState::Assigned,
+            });
+        }
+        self.pairing_request = match state {
+            false => DevicePairingState::PendingClear,
+            true => DevicePairingState::PendingSet,
+        };
+        Ok(())
+    }
+
+    pub fn open(&mut self) {
         self.set_channel_state = Some(ChannelStateCommand::Open);
-        self.pairing_request = pairing_request;
     }
 
     pub fn close(&mut self) {

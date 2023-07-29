@@ -81,8 +81,7 @@ impl HeartRateDisplay {
     }
 
     pub fn open(&mut self) {
-        // TODO handle pairing
-        self.msg_handler.open(false);
+        self.msg_handler.open();
     }
 
     pub fn close(&mut self) {
