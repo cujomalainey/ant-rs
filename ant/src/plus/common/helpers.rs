@@ -580,5 +580,57 @@ mod tests {
     };
 
     #[test]
-    fn inert_start() {}
+    fn inert_start() {
+        // TODO
+    }
+
+    #[test]
+    fn config() {
+        // TODO
+    }
+
+    #[test]
+    fn pairing_bit_slave() {
+        // TODO
+    }
+
+    #[test]
+    fn pairing_bit_master() {
+        // TODO
+    }
+
+    #[test]
+    fn state_transition_on_failure() {
+        // TODO
+    }
+
+    #[test]
+    fn signal_loss() {
+        // TODO
+    }
+
+    #[test]
+    fn open_channel() {
+        // TODO
+    }
+
+    #[test]
+    fn close_channel() {
+        // TODO
+    }
+
+    #[test]
+    fn check_config_close_open() {
+        // TODO
+    }
+
+    #[test]
+    fn check_config_reset_open() {
+        // TODO
+    }
+
+    #[test]
+    fn tx_signaling() {
+        // TODO
+    }
 }
