@@ -7,8 +7,8 @@
 // except according to those terms.
 
 use crate::messages::{AntMessage, TxMessage};
-use core::time::Duration;
 use const_utils::u64::min;
+use core::time::Duration;
 
 /// Helper to convert durations to search timeouts.
 /// Anything greater than or equal to 637.5s will default to inifinite timeout per ANT spec.
