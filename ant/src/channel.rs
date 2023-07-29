@@ -8,10 +8,13 @@
 
 use crate::messages::{AntMessage, TxMessage};
 use core::time::Duration;
+use const_utils::u64::min;
 
+/// Helper to convert durations to search timeouts.
+/// Anything greater than or equal to 637.5s will default to inifinite timeout per ANT spec.
 pub const fn duration_to_search_timeout(t: Duration) -> u8 {
     // Scale up by 10 to avoid floating point math as ratio is 2.5s to 1 count
-    ((t.as_secs() * 10) / (25)) as u8
+    min((t.as_secs() * 10) / (25), 255) as u8
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
