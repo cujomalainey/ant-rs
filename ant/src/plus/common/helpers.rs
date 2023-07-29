@@ -288,6 +288,12 @@ pub enum TransmissionTypeAssignment {
     DeviceNumberExtension(Integer<u8, packed_bits::Bits<4>>),
 }
 
+impl From<TransmissionType> for TransmissionTypeAssignment {
+    fn from(transmission_type: TransmissionType) -> TransmissionTypeAssignment {
+        TransmissionTypeAssignment::DeviceNumberExtension(transmission_type.device_number_extension)
+    }
+}
+
 pub struct ProfileReference {
     pub device_type: u8,
     pub channel_type: ChannelType,
@@ -300,21 +306,21 @@ pub struct ProfileReference {
 
 /// This struct constains everything constant from the point we passed in from the initialization,
 /// nothing in it should change even if we reset
-struct StateConfig {
+struct StateConfig<'a> {
     device_number: u16,
     transmission_type: TransmissionTypeAssignment,
     network_key_index: u8,
-    profile_reference: &'static ProfileReference,
+    profile_reference: &'a ProfileReference,
 }
 
-pub struct MessageHandler {
+pub struct MessageHandler<'a> {
     channel: ChannelAssignment,
     // TODO check to see if this bit auto clears on the radio after a connect
     // TODO handle profiles that wildcard device type
     /// Are we setting the pairing bit?
     pairing_request: DevicePairingState,
     /// Configuration state machine pointer
-    configure_state: &'static dyn ConfigureState,
+    configure_state: &'a dyn ConfigureState,
     /// State machine confgi message pending response
     configure_pending_response: bool,
     /// Previous TX transmission sent, ready for new message
@@ -329,17 +335,17 @@ pub struct MessageHandler {
     set_channel_state: Option<ChannelStateCommand>,
     /// Original passed in arguements. This is used to differentiate in slaves from wildcarded
     /// fields versus discovered data
-    state_config: StateConfig,
+    state_config: StateConfig<'a>,
     /// Last state of the channel we were aware of
     channel_state: ChannelState,
 }
 
-impl MessageHandler {
+impl<'a> MessageHandler<'a> {
     pub fn new(
         device_number: u16,
         transmission_type: TransmissionTypeAssignment,
         ant_plus_key_index: u8,
-        profile_reference: &'static ProfileReference,
+        profile_reference: &'a ProfileReference,
     ) -> Self {
         Self {
             channel: ChannelAssignment::UnAssigned(),
@@ -504,13 +510,12 @@ impl MessageHandler {
     // TODO Request this on connect
     fn handle_id(&mut self, msg: &ChannelId) -> Result<(), StateError> {
         if self.configure_state.get_state() == ConfigureStateId::Identify {
-            // TODO handle state identification
-            self.configure_state = &UNKNOWN_CLOSE_STATE;
+            self.configure_state = &DONE_STATE;
             self.configure_pending_response = false;
             return Ok(());
         }
         self.device_number = msg.device_number;
-        // TODO copy rest of state
+        self.transmission_type = msg.transmission_type.into();
         Ok(())
     }
 

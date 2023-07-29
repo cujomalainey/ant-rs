@@ -44,7 +44,7 @@ pub enum TxDataPages {
 }
 
 pub struct HeartRateDisplay {
-    msg_handler: MessageHandler,
+    msg_handler: MessageHandler<'static>,
     rx_message_callback: Option<fn(&AntMessage)>,
     rx_datapage_callback: Option<fn(Result<RxDataPages, HeartRateError>)>,
     tx_message_callback: Option<fn() -> Option<TxMessageChannelConfig>>,
