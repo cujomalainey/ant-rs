@@ -391,6 +391,7 @@ impl<'a> MessageHandler<'a> {
         self.tx_ready
     }
 
+    /// Signal that a datapage has been sent and we need to track the next TX_EVENT
     pub fn tx_sent(&mut self) {
         self.tx_ready = false;
     }
