@@ -456,7 +456,9 @@ impl<'a> MessageHandler<'a> {
 
         if self.tx_channel_id_request {
             self.tx_channel_id_request = false;
-            return Some(RequestMessage::new(channel, RequestableMessageId::ChannelId, None).into());
+            return Some(
+                RequestMessage::new(channel, RequestableMessageId::ChannelId, None).into(),
+            );
         }
 
         None
@@ -469,14 +471,14 @@ impl<'a> MessageHandler<'a> {
             RxMessage::ChannelId(msg) => self.handle_id(msg),
             RxMessage::ChannelStatus(msg) => self.handle_status(msg),
             RxMessage::BroadcastData(_)
-                | RxMessage::AcknowledgedData(_)
-                | RxMessage::BurstTransferData(_)
-                | RxMessage::AdvancedBurstData(_) => {
-                    if self.configure_state.get_state() == ConfigureStateId::Identify {
-                        self.tx_channel_id_request = true;
-                    }
-                    Ok(())
-            },
+            | RxMessage::AcknowledgedData(_)
+            | RxMessage::BurstTransferData(_)
+            | RxMessage::AdvancedBurstData(_) => {
+                if self.configure_state.get_state() == ConfigureStateId::Identify {
+                    self.tx_channel_id_request = true;
+                }
+                Ok(())
+            }
             _ => Ok(()),
         }
     }
