@@ -169,7 +169,7 @@ impl ConfigureState for Timeout {
             return self;
         }
         if response.message_code == MessageCode::ResponseNoError {
-            return &DONE_STATE;
+            return &IDENTIFY_STATE;
         }
         &ERROR_STATE
     }
@@ -250,13 +250,14 @@ impl ConfigureState for Identify {
     fn handle_response(&self, _response: &ChannelResponse) -> &dyn ConfigureState {
         self
     }
-    fn transmit_config(&self, channel: u8, _handler: &MessageHandler) -> Option<TxMessage> {
-        Some(RequestMessage::new(channel, RequestableMessageId::ChannelId, None).into())
+    fn transmit_config(&self, _channel: u8, _handler: &MessageHandler) -> Option<TxMessage> {
+        None
     }
     fn get_state(&self) -> ConfigureStateId {
         ConfigureStateId::Identify
     }
 }
+const IDENTIFY_STATE: Identify = Identify {};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ConfigureError {
@@ -315,7 +316,6 @@ struct StateConfig<'a> {
 
 pub struct MessageHandler<'a> {
     channel: ChannelAssignment,
-    // TODO check to see if this bit auto clears on the radio after a connect
     // TODO handle profiles that wildcard device type
     /// Are we setting the pairing bit?
     pairing_request: DevicePairingState,
@@ -338,6 +338,8 @@ pub struct MessageHandler<'a> {
     state_config: StateConfig<'a>,
     /// Last state of the channel we were aware of
     channel_state: ChannelState,
+    /// Transmit a request for channel id on next TX window
+    tx_channel_id_request: bool,
 }
 
 impl<'a> MessageHandler<'a> {
@@ -363,11 +365,25 @@ impl<'a> MessageHandler<'a> {
                 network_key_index: ant_plus_key_index,
                 profile_reference,
             },
+            tx_channel_id_request: false,
         }
     }
 
     pub fn get_channel(&self) -> ChannelAssignment {
         self.channel
+    }
+
+    /// Returns the current device_number in use
+    ///  TOOD slave/master
+    /// If a wildcard was set and device has not connected yet a wildcard will be returned.
+    /// Recommended to be called after [get_channel_state] returns tracking at least once or you
+    /// have observed a datapage recieved
+    pub fn get_device_id(&self) -> u16 {
+        self.device_number
+    }
+
+    pub fn is_tracking(&self) -> bool {
+        self.channel_state == ChannelState::Tracking
     }
 
     /// Returns true if a TX_EVENT has been recieved since last call.
@@ -396,7 +412,8 @@ impl<'a> MessageHandler<'a> {
         }
 
         // Block all data and runtime config until we complete config
-        if self.configure_state.get_state() != ConfigureStateId::Done {
+        let state = self.configure_state.get_state();
+        if state != ConfigureStateId::Done && state != ConfigureStateId::Identify {
             return None;
         }
 
@@ -435,7 +452,12 @@ impl<'a> MessageHandler<'a> {
             self.set_channel_state = None;
             return Some(msg);
         };
-        // TODO check if we need to request channel info once bonded
+
+        if self.tx_channel_id_request {
+            self.tx_channel_id_request = false;
+            return Some(RequestMessage::new(channel, RequestableMessageId::ChannelId, None).into());
+        }
+
         None
     }
 
@@ -445,39 +467,22 @@ impl<'a> MessageHandler<'a> {
             RxMessage::ChannelEvent(msg) => self.handle_event(msg),
             RxMessage::ChannelId(msg) => self.handle_id(msg),
             RxMessage::ChannelStatus(msg) => self.handle_status(msg),
+            RxMessage::BroadcastData(_)
+                | RxMessage::AcknowledgedData(_)
+                | RxMessage::BurstTransferData(_)
+                | RxMessage::AdvancedBurstData(_) => {
+                    if self.configure_state.get_state() == ConfigureStateId::Identify {
+                        self.tx_channel_id_request = true;
+                    }
+                    Ok(())
+            },
             _ => Ok(()),
         }
     }
 
-    // TODO add logic to request this on setup
-    // TODO This does not take into account user initited requests and could break state
     fn handle_status(&mut self, msg: &ChannelStatus) -> Result<(), StateError> {
-        let state = self.configure_state.get_state();
-        if state == ConfigureStateId::Error || state == ConfigureStateId::UnknownClose {
-            // We don't care about state because we know we are broken or resetting
-            return Ok(());
-        }
-        match msg.channel_state {
-            ChannelState::UnAssigned => {
-                if state == ConfigureStateId::Assign || state == ConfigureStateId::UnknownUnAssign {
-                    return Ok(());
-                }
-                self.reset_state(true);
-                Ok(())
-            }
-            ChannelState::Assigned | ChannelState::Searching | ChannelState::Tracking => {
-                match state {
-                    ConfigureStateId::Id
-                    | ConfigureStateId::Period
-                    | ConfigureStateId::Rf
-                    | ConfigureStateId::Timeout
-                    | ConfigureStateId::Done => return Ok(()),
-                    _ => (),
-                }
-                self.reset_state(true);
-                Ok(())
-            }
-        }
+        self.channel_state = msg.channel_state;
+        Ok(())
     }
 
     fn handle_response(&mut self, msg: &ChannelResponse) -> Result<(), StateError> {
@@ -507,12 +512,10 @@ impl<'a> MessageHandler<'a> {
         Ok(())
     }
 
-    // TODO Request this on connect
     fn handle_id(&mut self, msg: &ChannelId) -> Result<(), StateError> {
         if self.configure_state.get_state() == ConfigureStateId::Identify {
             self.configure_state = &DONE_STATE;
             self.configure_pending_response = false;
-            return Ok(());
         }
         self.device_number = msg.device_number;
         self.transmission_type = msg.transmission_type.into();

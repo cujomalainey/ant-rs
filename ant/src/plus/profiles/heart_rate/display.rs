@@ -88,6 +88,10 @@ impl HeartRateDisplay {
         self.msg_handler.close();
     }
 
+    pub fn get_device_id(&self) -> u16 {
+        self.msg_handler.get_device_id()
+    }
+
     pub fn set_rx_message_callback(&mut self, f: Option<fn(&AntMessage)>) {
         self.rx_message_callback = f;
     }
