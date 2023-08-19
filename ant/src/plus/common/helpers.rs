@@ -583,6 +583,7 @@ impl<'a> MessageHandler<'a> {
 mod tests {
     use super::*;
     use crate::channel::duration_to_search_timeout;
+    use crate::messages::{RxMessageHeader, RxSyncByte, TransmitableMessage};
     use core::time::Duration;
     const TEST_REFERENCE: ProfileReference = ProfileReference {
         device_type: 5,
@@ -594,14 +595,64 @@ mod tests {
         channel_period: 123,
     };
 
-    #[test]
-    fn inert_start() {
-        // TODO
+    fn get_response_ok(id: TxMessageId) -> AntMessage {
+        AntMessage {
+            header: RxMessageHeader {
+                sync: RxSyncByte::Write,
+                msg_id: crate::messages::RxMessageId::ChannelEvent,
+                msg_length: 3,
+            },
+            message: RxMessage::ChannelResponse(ChannelResponse {
+                channel_number: 0,
+                message_id: id,
+                message_code: MessageCode::ResponseNoError,
+            }),
+            checksum: 123, // this doesn't matter
+        }
+    }
+
+    fn get_config_message(msg_handler: &mut MessageHandler, id: TxMessageId) -> TxMessage {
+        while let Some(data) = msg_handler.send_message() {
+            if data.get_tx_msg_id() == id {
+                return data;
+            }
+            // Not our message, fake ok and resume
+            msg_handler
+                .receive_message(&get_response_ok(data.get_tx_msg_id()))
+                .expect("State machine error");
+        }
+        panic!("Message not found")
     }
 
     #[test]
-    fn config() {
-        // TODO
+    fn inert_start() {
+        let mut msg_handler = MessageHandler::new(
+            1234,
+            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
+            0,
+            &TEST_REFERENCE,
+        );
+        assert!(msg_handler.send_message().is_none());
+    }
+
+    #[test]
+    fn test_assign_config() {
+        let mut msg_handler = MessageHandler::new(
+            1234,
+            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
+            0,
+            &TEST_REFERENCE,
+        );
+        msg_handler.set_channel(ChannelAssignment::Assigned(4));
+        let data = get_config_message(&mut msg_handler, TxMessageId::AssignChannel);
+        if let TxMessage::AssignChannel(data) = data {
+            assert_eq!(data.data.channel_number, 4);
+            assert_eq!(data.data.channel_type, ChannelType::BidirectionalSlave);
+            assert_eq!(data.data.network_number, 0);
+            assert_eq!(data.extended_assignment, None);
+            return;
+        }
+        panic!("Message not found by helper");
     }
 
     #[test]
