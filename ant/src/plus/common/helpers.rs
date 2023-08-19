@@ -560,14 +560,18 @@ impl<'a> MessageHandler<'a> {
         self.set_channel_state = Some(ChannelStateCommand::Close);
     }
 
+    /// Moves config to a new channel while maintaining bonding information
     pub fn set_channel(&mut self, channel: ChannelAssignment) {
         self.channel = channel;
-        self.configure_state = &UNKNOWN_CLOSE_STATE;
+        self.reset_state(false);
     }
 
-    fn reset_state(&mut self, reset_id_data: bool) {
+    /// Resets assumed channel state. Maintains bonding information if `reset_id_data` is `false`.
+    pub fn reset_state(&mut self, reset_id_data: bool) {
         self.configure_state = &UNKNOWN_CLOSE_STATE;
         self.configure_pending_response = false;
+        self.tx_ready = true;
+        self.channel_state = ChannelState::UnAssigned;
         if reset_id_data {
             self.device_number = self.state_config.device_number;
             self.transmission_type = self.state_config.transmission_type;
