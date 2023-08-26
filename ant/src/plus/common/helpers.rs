@@ -636,7 +636,7 @@ mod tests {
     }
 
     #[test]
-    fn test_assign_config() {
+    fn assign_config() {
         let mut msg_handler = MessageHandler::new(
             1234,
             TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
@@ -650,6 +650,121 @@ mod tests {
             assert_eq!(data.data.channel_type, ChannelType::BidirectionalSlave);
             assert_eq!(data.data.network_number, 0);
             assert_eq!(data.extended_assignment, None);
+            return;
+        }
+        panic!("Message not found by helper");
+    }
+
+    #[test]
+    fn close_state() {
+        let mut msg_handler = MessageHandler::new(
+            1234,
+            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
+            0,
+            &TEST_REFERENCE,
+        );
+        msg_handler.set_channel(ChannelAssignment::Assigned(4));
+        let data = get_config_message(&mut msg_handler, TxMessageId::CloseChannel);
+        if let TxMessage::CloseChannel(data) = data {
+            assert_eq!(data.channel_number, 4);
+            return;
+        }
+        panic!("Message not found by helper");
+    }
+
+    #[test]
+    fn unassign_state() {
+        let mut msg_handler = MessageHandler::new(
+            1234,
+            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
+            0,
+            &TEST_REFERENCE,
+        );
+        msg_handler.set_channel(ChannelAssignment::Assigned(4));
+        let data = get_config_message(&mut msg_handler, TxMessageId::UnAssignChannel);
+        if let TxMessage::UnAssignChannel(data) = data {
+            assert_eq!(data.channel_number, 4);
+            return;
+        }
+        panic!("Message not found by helper");
+    }
+
+    #[test]
+    fn channel_id_state() {
+        let mut msg_handler = MessageHandler::new(
+            1234,
+            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
+            0,
+            &TEST_REFERENCE,
+        );
+        msg_handler.set_channel(ChannelAssignment::Assigned(4));
+        let data = get_config_message(&mut msg_handler, TxMessageId::ChannelId);
+        if let TxMessage::ChannelId(data) = data {
+            assert_eq!(data.channel_number, 4);
+            assert_eq!(data.device_number, 1234);
+            assert_eq!(data.device_type, DeviceType::new(5.into(), false));
+            assert_eq!(
+                data.transmission_type,
+                TransmissionType::new(
+                    TransmissionChannelType::IndependentChannel,
+                    TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+                    12.into()
+                )
+            );
+            return;
+        }
+        panic!("Message not found by helper");
+    }
+
+    #[test]
+    fn channel_frequency_state() {
+        let mut msg_handler = MessageHandler::new(
+            1234,
+            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
+            0,
+            &TEST_REFERENCE,
+        );
+        msg_handler.set_channel(ChannelAssignment::Assigned(4));
+        let data = get_config_message(&mut msg_handler, TxMessageId::ChannelRfFrequency);
+        if let TxMessage::ChannelRfFrequency(data) = data {
+            assert_eq!(data.channel_number, 4);
+            assert_eq!(data.rf_frequency, 25);
+            return;
+        }
+        panic!("Message not found by helper");
+    }
+
+    #[test]
+    fn channel_period_state() {
+        let mut msg_handler = MessageHandler::new(
+            1234,
+            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
+            0,
+            &TEST_REFERENCE,
+        );
+        msg_handler.set_channel(ChannelAssignment::Assigned(4));
+        let data = get_config_message(&mut msg_handler, TxMessageId::ChannelPeriod);
+        if let TxMessage::ChannelPeriod(data) = data {
+            assert_eq!(data.channel_number, 4);
+            assert_eq!(data.channel_period, 123);
+            return;
+        }
+        panic!("Message not found by helper");
+    }
+
+    #[test]
+    fn search_timeout_state() {
+        let mut msg_handler = MessageHandler::new(
+            1234,
+            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
+            0,
+            &TEST_REFERENCE,
+        );
+        msg_handler.set_channel(ChannelAssignment::Assigned(4));
+        let data = get_config_message(&mut msg_handler, TxMessageId::SearchTimeout);
+        if let TxMessage::SearchTimeout(data) = data {
+            assert_eq!(data.channel_number, 4);
+            assert_eq!(data.search_timeout, 12);
             return;
         }
         panic!("Message not found by helper");
@@ -686,17 +801,12 @@ mod tests {
     }
 
     #[test]
-    fn check_config_close_open() {
-        // TODO
-    }
-
-    #[test]
-    fn check_config_reset_open() {
-        // TODO
-    }
-
-    #[test]
     fn tx_signaling() {
+        // TODO
+    }
+
+    #[test]
+    fn reset() {
         // TODO
     }
 }
