@@ -9,13 +9,12 @@
 use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
 use crate::messages::config::{ChannelType, TransmissionChannelType, TransmissionGlobalDataPages};
 use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig, TxMessageData};
-use crate::plus::common::datapages::{ModeSettings, RequestDataPage, MANUFACTURER_SPECIFIC_RANGE};
-use crate::plus::common::helpers::StateError;
+use crate::plus::common::datapages::MANUFACTURER_SPECIFIC_RANGE;
 use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
 use crate::plus::profiles::heart_rate::{
     BatteryStatus, Capabilities, CumulativeOperatingTime, DataPageNumbers, DefaultDataPage,
-    DeviceInformation, ManufacturerInformation, ManufacturerSpecific, PreviousHeartBeat,
-    ProductInformation, SwimIntervalSummary, DATA_PAGE_NUMBER_MASK,
+    DeviceInformation, Error, ManufacturerInformation, ManufacturerSpecific, MonitorTxDataPages,
+    PreviousHeartBeat, ProductInformation, SwimIntervalSummary, DATA_PAGE_NUMBER_MASK,
 };
 use crate::plus::NETWORK_RF_FREQUENCY;
 
@@ -23,35 +22,15 @@ use packed_struct::{PackedStruct, PrimitiveEnum};
 
 use std::time::Duration;
 
-#[derive(PartialEq, Copy, Clone, Debug)]
-pub enum RxDataPages {
-    DefaultDataPage(DefaultDataPage),
-    CumulativeOperatingTime(CumulativeOperatingTime),
-    ManufacturerInformation(ManufacturerInformation),
-    ProductInformation(ProductInformation),
-    PreviousHeartBeat(PreviousHeartBeat),
-    SwimIntervalSummary(SwimIntervalSummary),
-    Capabilities(Capabilities),
-    BatteryStatus(BatteryStatus),
-    DeviceInformation(DeviceInformation),
-    ManufacturerSpecific(ManufacturerSpecific),
-}
-
-pub enum TxDataPages {
-    RequestDataPage(RequestDataPage),
-    ModeSettings(ModeSettings),
-    ManufacturerSpecific(ManufacturerSpecific),
-}
-
-pub struct HeartRateDisplay {
+pub struct Display {
     msg_handler: MessageHandler<'static>,
     rx_message_callback: Option<fn(&AntMessage)>,
-    rx_datapage_callback: Option<fn(Result<RxDataPages, HeartRateError>)>,
+    rx_datapage_callback: Option<fn(Result<MonitorTxDataPages, Error>)>,
     tx_message_callback: Option<fn() -> Option<TxMessageChannelConfig>>,
     tx_datapage_callback: Option<fn() -> Option<TxMessageData>>,
 }
 
-const HR_REFERENCE: ProfileReference = ProfileReference {
+const HR_DISPLAY_REFERENCE: ProfileReference = ProfileReference {
     device_type: 120,
     channel_type: ChannelType::BidirectionalSlave,
     transmission_channel_type: TransmissionChannelType::IndependentChannel,
@@ -61,7 +40,7 @@ const HR_REFERENCE: ProfileReference = ProfileReference {
     channel_period: 8070,
 };
 
-impl HeartRateDisplay {
+impl Display {
     pub fn new(device: Option<(u16, TransmissionTypeAssignment)>, ant_plus_key_index: u8) -> Self {
         let device = device.unwrap_or((0, TransmissionTypeAssignment::Wildcard()));
         let device_number = device.0;
@@ -75,7 +54,7 @@ impl HeartRateDisplay {
                 device_number,
                 transmission_type,
                 ant_plus_key_index,
-                &HR_REFERENCE,
+                &HR_DISPLAY_REFERENCE,
             ),
         }
     }
@@ -96,7 +75,7 @@ impl HeartRateDisplay {
         self.rx_message_callback = f;
     }
 
-    pub fn set_rx_datapage_callback(&mut self, f: Option<fn(Result<RxDataPages, HeartRateError>)>) {
+    pub fn set_rx_datapage_callback(&mut self, f: Option<fn(Result<MonitorTxDataPages, Error>)>) {
         self.rx_datapage_callback = f;
     }
 
@@ -112,54 +91,58 @@ impl HeartRateDisplay {
         }
     }
 
-    fn parse_dp(&mut self, data: &[u8; 8]) -> Result<RxDataPages, HeartRateError> {
+    fn parse_dp(&mut self, data: &[u8; 8]) -> Result<MonitorTxDataPages, Error> {
         let dp_num = data[0] & DATA_PAGE_NUMBER_MASK;
         if let Some(dp) = DataPageNumbers::from_primitive(dp_num) {
             let parsed = match dp {
                 DataPageNumbers::DefaultDataPage => {
-                    RxDataPages::DefaultDataPage(DefaultDataPage::unpack(data)?)
+                    MonitorTxDataPages::DefaultDataPage(DefaultDataPage::unpack(data)?)
                 }
                 DataPageNumbers::CumulativeOperatingTime => {
-                    RxDataPages::CumulativeOperatingTime(CumulativeOperatingTime::unpack(data)?)
+                    MonitorTxDataPages::CumulativeOperatingTime(CumulativeOperatingTime::unpack(
+                        data,
+                    )?)
                 }
                 DataPageNumbers::ManufacturerInformation => {
-                    RxDataPages::ManufacturerInformation(ManufacturerInformation::unpack(data)?)
+                    MonitorTxDataPages::ManufacturerInformation(ManufacturerInformation::unpack(
+                        data,
+                    )?)
                 }
                 DataPageNumbers::ProductInformation => {
-                    RxDataPages::ProductInformation(ProductInformation::unpack(data)?)
+                    MonitorTxDataPages::ProductInformation(ProductInformation::unpack(data)?)
                 }
                 DataPageNumbers::PreviousHeartBeat => {
-                    RxDataPages::PreviousHeartBeat(PreviousHeartBeat::unpack(data)?)
+                    MonitorTxDataPages::PreviousHeartBeat(PreviousHeartBeat::unpack(data)?)
                 }
                 DataPageNumbers::SwimIntervalSummary => {
-                    RxDataPages::SwimIntervalSummary(SwimIntervalSummary::unpack(data)?)
+                    MonitorTxDataPages::SwimIntervalSummary(SwimIntervalSummary::unpack(data)?)
                 }
                 DataPageNumbers::Capabilities => {
-                    RxDataPages::Capabilities(Capabilities::unpack(data)?)
+                    MonitorTxDataPages::Capabilities(Capabilities::unpack(data)?)
                 }
                 DataPageNumbers::BatteryStatus => {
-                    RxDataPages::BatteryStatus(BatteryStatus::unpack(data)?)
+                    MonitorTxDataPages::BatteryStatus(BatteryStatus::unpack(data)?)
                 }
                 DataPageNumbers::DeviceInformation => {
-                    RxDataPages::DeviceInformation(DeviceInformation::unpack(data)?)
+                    MonitorTxDataPages::DeviceInformation(DeviceInformation::unpack(data)?)
                 }
                 // Add all valid profile specific pages below if they are invalid in this direction
                 DataPageNumbers::HRFeatureCommand => {
-                    return Err(HeartRateError::UnsupportedDataPage(dp_num))
+                    return Err(Error::UnsupportedDataPage(dp_num))
                 }
             };
             return Ok(parsed);
         }
         if MANUFACTURER_SPECIFIC_RANGE.contains(&dp_num) {
-            return Ok(RxDataPages::ManufacturerSpecific(
+            return Ok(MonitorTxDataPages::ManufacturerSpecific(
                 ManufacturerSpecific::unpack(data)?,
             ));
         }
-        Err(HeartRateError::UnsupportedDataPage(dp_num))
+        Err(Error::UnsupportedDataPage(dp_num))
     }
 }
 
-impl Channel for HeartRateDisplay {
+impl Channel for Display {
     fn receive_message(&mut self, msg: &AntMessage) {
         if let Some(f) = self.rx_message_callback {
             f(msg);
@@ -209,26 +192,5 @@ impl Channel for HeartRateDisplay {
 
     fn set_channel(&mut self, channel: ChannelAssignment) {
         self.msg_handler.set_channel(channel);
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum HeartRateError {
-    BytePatternError(packed_struct::PackingError),
-    UnsupportedDataPage(u8),
-    PageAlreadyPending(),
-    NotAssociated(),
-    ConfigurationError(StateError),
-}
-
-impl From<packed_struct::PackingError> for HeartRateError {
-    fn from(err: packed_struct::PackingError) -> Self {
-        Self::BytePatternError(err)
-    }
-}
-
-impl From<StateError> for HeartRateError {
-    fn from(err: StateError) -> Self {
-        Self::ConfigurationError(err)
     }
 }

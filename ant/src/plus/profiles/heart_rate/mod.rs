@@ -8,8 +8,53 @@
 
 mod datapages;
 mod display;
-// mod monitor;
+mod monitor;
 
 pub use datapages::*;
 pub use display::*;
-// pub use monitor::*;
+pub use monitor::*;
+
+use crate::plus::common::datapages::{ModeSettings, RequestDataPage};
+use crate::plus::common::helpers::StateError;
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum MonitorTxDataPages {
+    DefaultDataPage(DefaultDataPage),
+    CumulativeOperatingTime(CumulativeOperatingTime),
+    ManufacturerInformation(ManufacturerInformation),
+    ProductInformation(ProductInformation),
+    PreviousHeartBeat(PreviousHeartBeat),
+    SwimIntervalSummary(SwimIntervalSummary),
+    Capabilities(Capabilities),
+    BatteryStatus(BatteryStatus),
+    DeviceInformation(DeviceInformation),
+    ManufacturerSpecific(ManufacturerSpecific),
+}
+
+pub enum DisplayTxDataPages {
+    HRFeatureCommand(HRFeatureCommand),
+    RequestDataPage(RequestDataPage),
+    ModeSettings(ModeSettings),
+    ManufacturerSpecific(ManufacturerSpecific),
+}
+
+#[derive(Debug, Clone)]
+pub enum Error {
+    BytePatternError(packed_struct::PackingError),
+    UnsupportedDataPage(u8),
+    PageAlreadyPending(),
+    NotAssociated(),
+    ConfigurationError(StateError),
+}
+
+impl From<packed_struct::PackingError> for Error {
+    fn from(err: packed_struct::PackingError) -> Self {
+        Self::BytePatternError(err)
+    }
+}
+
+impl From<StateError> for Error {
+    fn from(err: StateError) -> Self {
+        Self::ConfigurationError(err)
+    }
+}

@@ -374,10 +374,12 @@ impl<'a> MessageHandler<'a> {
     }
 
     /// Returns the current device_number in use
-    ///  TOOD slave/master
-    /// If a wildcard was set and device has not connected yet a wildcard will be returned.
+    ///
+    /// Slave channels: If a wildcard was set and device has not connected yet a wildcard will be returned.
     /// Recommended to be called after [get_channel_state] returns tracking at least once or you
     /// have observed a datapage recieved
+    ///
+    /// Master channels: returns the ID being broadcasted
     pub fn get_device_id(&self) -> u16 {
         self.device_number
     }
