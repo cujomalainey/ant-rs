@@ -13,7 +13,7 @@ use crate::plus::common::datapages::{
     DataPageNumbers as CommonDataPageNumbers, ModeSettings, RequestDataPage,
     MANUFACTURER_SPECIFIC_RANGE,
 };
-use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
+use crate::plus::common::msg_handler::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
 use crate::plus::profiles::heart_rate::{
     DataPageNumbers, DisplayTxDataPages, Error, HRFeatureCommand, ManufacturerSpecific,
     DATA_PAGE_NUMBER_MASK,

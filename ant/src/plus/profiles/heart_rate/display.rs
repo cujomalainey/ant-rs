@@ -10,7 +10,7 @@ use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
 use crate::messages::config::{ChannelType, TransmissionChannelType, TransmissionGlobalDataPages};
 use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig, TxMessageData};
 use crate::plus::common::datapages::MANUFACTURER_SPECIFIC_RANGE;
-use crate::plus::common::helpers::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
+use crate::plus::common::msg_handler::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
 use crate::plus::profiles::heart_rate::{
     BatteryStatus, Capabilities, CumulativeOperatingTime, DataPageNumbers, DefaultDataPage,
     DeviceInformation, Error, ManufacturerInformation, ManufacturerSpecific, MonitorTxDataPages,

@@ -15,7 +15,7 @@ pub use display::*;
 pub use monitor::*;
 
 use crate::plus::common::datapages::{ModeSettings, RequestDataPage};
-use crate::plus::common::helpers::StateError;
+use crate::plus::common::msg_handler::StateError;
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum MonitorTxDataPages {
