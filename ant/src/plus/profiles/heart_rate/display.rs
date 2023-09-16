@@ -7,10 +7,12 @@
 // except according to those terms.
 
 use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
-use crate::messages::config::{ChannelType, TransmissionChannelType, TransmissionGlobalDataPages};
+use crate::messages::config::{
+    ChannelType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
+};
 use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig, TxMessageData};
 use crate::plus::common::datapages::MANUFACTURER_SPECIFIC_RANGE;
-use crate::plus::common::msg_handler::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
+use crate::plus::common::msg_handler::{ChannelConfig, MessageHandler};
 use crate::plus::profiles::heart_rate::{
     BatteryStatus, Capabilities, CumulativeOperatingTime, DataPageNumbers, DefaultDataPage,
     DeviceInformation, Error, ManufacturerInformation, ManufacturerSpecific, MonitorTxDataPages,
@@ -18,44 +20,42 @@ use crate::plus::profiles::heart_rate::{
 };
 use crate::plus::NETWORK_RF_FREQUENCY;
 
+use packed_struct::prelude::{packed_bits::Bits, Integer};
 use packed_struct::{PackedStruct, PrimitiveEnum};
 
 use std::time::Duration;
 
 pub struct Display {
-    msg_handler: MessageHandler<'static>,
+    msg_handler: MessageHandler,
     rx_message_callback: Option<fn(&AntMessage)>,
     rx_datapage_callback: Option<fn(Result<MonitorTxDataPages, Error>)>,
     tx_message_callback: Option<fn() -> Option<TxMessageChannelConfig>>,
     tx_datapage_callback: Option<fn() -> Option<TxMessageData>>,
 }
 
-const HR_DISPLAY_REFERENCE: ProfileReference = ProfileReference {
-    device_type: 120,
-    channel_type: ChannelType::BidirectionalSlave,
-    transmission_channel_type: TransmissionChannelType::IndependentChannel,
-    global_datapages_used: TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
-    radio_frequency: NETWORK_RF_FREQUENCY,
-    timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
-    channel_period: 8070,
-};
-
 impl Display {
-    pub fn new(device: Option<(u16, TransmissionTypeAssignment)>, ant_plus_key_index: u8) -> Self {
-        let device = device.unwrap_or((0, TransmissionTypeAssignment::Wildcard()));
-        let device_number = device.0;
-        let transmission_type = device.1;
+    pub fn new(device: Option<(u16, Integer<u8, Bits<4>>)>, ant_plus_key_index: u8) -> Self {
+        let (device_number, transmission_type_extension) = device.unwrap_or((0, 0.into()));
+        let channel_config = ChannelConfig {
+            device_number,
+            device_type: 120,
+            channel_type: ChannelType::BidirectionalSlave,
+            network_key_index: ant_plus_key_index,
+            transmission_type: TransmissionType::new(
+                TransmissionChannelType::IndependentChannel,
+                TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+                transmission_type_extension,
+            ),
+            radio_frequency: NETWORK_RF_FREQUENCY,
+            timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
+            channel_period: 8070,
+        };
         Self {
             rx_message_callback: None,
             rx_datapage_callback: None,
             tx_message_callback: None,
             tx_datapage_callback: None,
-            msg_handler: MessageHandler::new(
-                device_number,
-                transmission_type,
-                ant_plus_key_index,
-                &HR_DISPLAY_REFERENCE,
-            ),
+            msg_handler: MessageHandler::new(&channel_config),
         }
     }
 

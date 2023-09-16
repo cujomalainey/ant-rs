@@ -7,57 +7,61 @@
 // except according to those terms.
 
 use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
-use crate::messages::config::{ChannelType, TransmissionChannelType, TransmissionGlobalDataPages};
+use crate::messages::config::{
+    ChannelType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
+};
 use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig, TxMessageData};
 use crate::plus::common::datapages::{
     DataPageNumbers as CommonDataPageNumbers, ModeSettings, RequestDataPage,
     MANUFACTURER_SPECIFIC_RANGE,
 };
-use crate::plus::common::msg_handler::{MessageHandler, ProfileReference, TransmissionTypeAssignment};
+use crate::plus::common::msg_handler::{ChannelConfig, MessageHandler};
 use crate::plus::profiles::heart_rate::{
     DataPageNumbers, DisplayTxDataPages, Error, HRFeatureCommand, ManufacturerSpecific,
-    DATA_PAGE_NUMBER_MASK,
+    MonitorTxDataPages, Period, DATA_PAGE_NUMBER_MASK,
 };
 use crate::plus::NETWORK_RF_FREQUENCY;
 
+use packed_struct::prelude::{packed_bits::Bits, Integer};
 use packed_struct::{PackedStruct, PrimitiveEnum};
 
 use std::time::Duration;
 
 pub struct Monitor {
-    msg_handler: MessageHandler<'static>,
+    msg_handler: MessageHandler,
     rx_message_callback: Option<fn(&AntMessage)>,
     rx_datapage_callback: Option<fn(Result<DisplayTxDataPages, Error>)>,
     tx_message_callback: Option<fn() -> Option<TxMessageChannelConfig>>,
-    tx_datapage_callback: Option<fn() -> Option<TxMessageData>>,
+    tx_datapage_callback: Option<fn(&MonitorTxDataPages) -> Option<TxMessageData>>,
 }
 
-const HR_MONITOR_REFERENCE: ProfileReference = ProfileReference {
-    device_type: 120,
-    channel_type: ChannelType::BidirectionalMaster,
-    transmission_channel_type: TransmissionChannelType::IndependentChannel,
-    global_datapages_used: TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
-    radio_frequency: NETWORK_RF_FREQUENCY,
-    timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
-    channel_period: 8070,
-};
+pub struct HrMonitorConfig {
+    device_number: u16,
+    transmission_type_extension: Integer<u8, Bits<4>>,
+    channel_period: Period,
+}
 
 impl Monitor {
-    pub fn new(device: Option<(u16, TransmissionTypeAssignment)>, ant_plus_key_index: u8) -> Self {
-        let device = device.unwrap_or((0, TransmissionTypeAssignment::Wildcard()));
-        let device_number = device.0;
-        let transmission_type = device.1;
+    pub fn new(config: HrMonitorConfig, ant_plus_key_index: u8) -> Self {
         Self {
             rx_message_callback: None,
             rx_datapage_callback: None,
             tx_message_callback: None,
             tx_datapage_callback: None,
-            msg_handler: MessageHandler::new(
-                device_number,
-                transmission_type,
-                ant_plus_key_index,
-                &HR_MONITOR_REFERENCE,
-            ),
+            msg_handler: MessageHandler::new(&ChannelConfig {
+                device_number: 56, // TODO set from config
+                device_type: 120,
+                channel_type: ChannelType::BidirectionalMaster,
+                network_key_index: ant_plus_key_index,
+                transmission_type: TransmissionType::new(
+                    TransmissionChannelType::IndependentChannel,
+                    TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+                    5.into(),
+                ), // TODO set from config
+                radio_frequency: NETWORK_RF_FREQUENCY,
+                timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
+                channel_period: 8070,
+            }),
         }
     }
 
@@ -120,7 +124,7 @@ impl Monitor {
                     DisplayTxDataPages::ModeSettings(ModeSettings::unpack(data)?)
                 }
                 CommonDataPageNumbers::RequestDataPage => {
-                // TODO handle properly into cycle
+                    // TODO handle properly into cycle
                     DisplayTxDataPages::RequestDataPage(RequestDataPage::unpack(data)?)
                 }
                 _ => return Err(Error::UnsupportedDataPage(dp_num)),
@@ -132,6 +136,10 @@ impl Monitor {
             ));
         }
         Err(Error::UnsupportedDataPage(dp_num))
+    }
+
+    fn get_next_datapage(&mut self) -> MonitorTxDataPages {
+        todo!();
     }
 }
 
@@ -173,7 +181,8 @@ impl Channel for Monitor {
         }
         if self.msg_handler.is_tx_ready() {
             if let Some(callback) = self.tx_datapage_callback {
-                if let Some(mut msg) = callback() {
+                let dp = self.get_next_datapage();
+                if let Some(mut msg) = callback(&dp) {
                     msg.set_channel(channel);
                     self.msg_handler.tx_sent();
                     return Some(msg.into());

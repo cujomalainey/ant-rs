@@ -17,6 +17,13 @@ pub use monitor::*;
 use crate::plus::common::datapages::{ModeSettings, RequestDataPage};
 use crate::plus::common::msg_handler::StateError;
 
+#[derive(Debug, Default)]
+pub enum Period {
+    #[default]
+    FourHz,
+    HalfHz,
+}
+
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum MonitorTxDataPages {
     DefaultDataPage(DefaultDataPage),

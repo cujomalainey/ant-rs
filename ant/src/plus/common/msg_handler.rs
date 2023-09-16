@@ -10,13 +10,11 @@ use crate::channel::ChannelAssignment;
 use crate::messages::channel::{ChannelEvent, ChannelResponse, MessageCode};
 use crate::messages::config::{
     AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
-    SearchTimeout, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
-    UnAssignChannel,
+    SearchTimeout, TransmissionType, UnAssignChannel,
 };
 use crate::messages::control::{CloseChannel, OpenChannel, RequestMessage, RequestableMessageId};
 use crate::messages::requested_response::{ChannelState, ChannelStatus};
 use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageId};
-use packed_struct::prelude::{packed_bits, Integer};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConfigureStateId {
@@ -38,20 +36,6 @@ trait ConfigureState {
     fn get_state(&self) -> ConfigureStateId;
 }
 
-fn transmission_type_from_state(handler: &MessageHandler) -> TransmissionType {
-    match handler.transmission_type {
-        TransmissionTypeAssignment::Wildcard() => TransmissionType::new_wildcard(),
-        TransmissionTypeAssignment::DeviceNumberExtension(x) => TransmissionType::new(
-            handler
-                .state_config
-                .profile_reference
-                .transmission_channel_type,
-            handler.state_config.profile_reference.global_datapages_used,
-            x,
-        ),
-    }
-}
-
 struct Assign {}
 impl ConfigureState for Assign {
     fn handle_response(&self, response: &ChannelResponse) -> &dyn ConfigureState {
@@ -67,8 +51,8 @@ impl ConfigureState for Assign {
         Some(
             AssignChannel::new(
                 channel,
-                handler.state_config.profile_reference.channel_type,
-                handler.state_config.network_key_index,
+                handler.state_config.channel_config.channel_type,
+                handler.state_config.channel_config.network_key_index,
                 None,
             )
             .into(),
@@ -91,13 +75,7 @@ impl ConfigureState for Period {
         &ERROR_STATE
     }
     fn transmit_config(&self, channel: u8, handler: &MessageHandler) -> Option<TxMessage> {
-        Some(
-            ChannelPeriod::new(
-                channel,
-                handler.state_config.profile_reference.channel_period,
-            )
-            .into(),
-        )
+        Some(ChannelPeriod::new(channel, handler.state_config.channel_config.channel_period).into())
     }
     fn get_state(&self) -> ConfigureStateId {
         ConfigureStateId::Period
@@ -119,15 +97,15 @@ impl ConfigureState for Id {
         Some(
             ChannelId::new(
                 channel,
-                handler.device_number,
+                handler.state_config.device_number,
                 DeviceType::new(
-                    handler.state_config.profile_reference.device_type.into(),
+                    handler.state_config.channel_config.device_type.into(),
                     matches!(
                         handler.pairing_request,
                         DevicePairingState::PendingSet | DevicePairingState::BitSet
                     ),
                 ),
-                transmission_type_from_state(handler),
+                handler.state_config.transmission_type,
             )
             .into(),
         )
@@ -150,11 +128,8 @@ impl ConfigureState for Rf {
     }
     fn transmit_config(&self, channel: u8, handler: &MessageHandler) -> Option<TxMessage> {
         Some(
-            ChannelRfFrequency::new(
-                channel,
-                handler.state_config.profile_reference.radio_frequency,
-            )
-            .into(),
+            ChannelRfFrequency::new(channel, handler.state_config.channel_config.radio_frequency)
+                .into(),
         )
     }
     fn get_state(&self) -> ConfigureStateId {
@@ -177,7 +152,7 @@ impl ConfigureState for Timeout {
         Some(
             SearchTimeout::new(
                 channel,
-                handler.state_config.profile_reference.timeout_duration,
+                handler.state_config.channel_config.timeout_duration,
             )
             .into(),
         )
@@ -283,72 +258,58 @@ enum ChannelStateCommand {
     Open,
     Close,
 }
-#[derive(Clone, Copy, Debug)]
-pub enum TransmissionTypeAssignment {
-    Wildcard(),
-    DeviceNumberExtension(Integer<u8, packed_bits::Bits<4>>),
-}
 
-impl From<TransmissionType> for TransmissionTypeAssignment {
-    fn from(transmission_type: TransmissionType) -> TransmissionTypeAssignment {
-        TransmissionTypeAssignment::DeviceNumberExtension(transmission_type.device_number_extension)
-    }
-}
-
-pub struct ProfileReference {
+// TODO doc
+#[derive(Copy, Clone, Debug)]
+pub struct ChannelConfig {
+    pub device_number: u16,
     pub device_type: u8,
     pub channel_type: ChannelType,
-    pub transmission_channel_type: TransmissionChannelType, // ignoring device number extension
-    pub global_datapages_used: TransmissionGlobalDataPages,
+    pub transmission_type: TransmissionType,
     pub radio_frequency: u8,
     pub timeout_duration: u8,
     pub channel_period: u16,
+    pub network_key_index: u8,
 }
 
 /// This struct constains everything constant from the point we passed in from the initialization,
 /// nothing in it should change even if we reset
-struct StateConfig<'a> {
-    device_number: u16,
-    transmission_type: TransmissionTypeAssignment,
-    network_key_index: u8,
-    profile_reference: &'a ProfileReference,
-}
-
-pub struct MessageHandler<'a> {
-    channel: ChannelAssignment,
-    // TODO handle profiles that wildcard device type
-    /// Are we setting the pairing bit?
-    pairing_request: DevicePairingState,
-    /// Configuration state machine pointer
-    configure_state: &'a dyn ConfigureState,
-    /// State machine confgi message pending response
-    configure_pending_response: bool,
-    /// Previous TX transmission sent, ready for new message
-    tx_ready: bool,
+struct StateConfig {
     /// Device number
     /// For master's this is their ID
     /// For slaves this is the masters' ID
     device_number: u16,
-    /// Transmisison type of the channel
-    transmission_type: TransmissionTypeAssignment,
+    device_type: DeviceType,
+    /// Actual transmisison type of the channel (extension only)
+    transmission_type: TransmissionType,
+    /// Static passed in (assigned) config, may contain wildcards and is not reflective of what
+    /// system may have bonded to
+    channel_config: ChannelConfig,
+}
+
+pub struct MessageHandler {
+    channel: ChannelAssignment,
+    /// Are we setting the pairing bit?
+    pairing_request: DevicePairingState,
+    /// Configuration state machine pointer
+    configure_state: &'static dyn ConfigureState,
+    /// State machine confgi message pending response
+    configure_pending_response: bool,
+    /// Previous TX transmission sent, ready for new message
+    tx_ready: bool,
     /// Pending command to open/close the channel
     set_channel_state: Option<ChannelStateCommand>,
     /// Original passed in arguements. This is used to differentiate in slaves from wildcarded
     /// fields versus discovered data
-    state_config: StateConfig<'a>,
+    state_config: StateConfig,
     /// Last state of the channel we were aware of
     channel_state: ChannelState,
     /// Transmit a request for channel id on next TX window
     tx_channel_id_request: bool,
 }
 
-impl<'a> MessageHandler<'a> {
-    pub fn new(
-        device_number: u16,
-        transmission_type: TransmissionTypeAssignment,
-        ant_plus_key_index: u8,
-        profile_reference: &'a ProfileReference,
-    ) -> Self {
+impl MessageHandler {
+    pub fn new(channel_config: &ChannelConfig) -> Self {
         Self {
             channel: ChannelAssignment::UnAssigned(),
             configure_state: &UNKNOWN_CLOSE_STATE,
@@ -357,16 +318,16 @@ impl<'a> MessageHandler<'a> {
             pairing_request: DevicePairingState::BitCleared,
             configure_pending_response: false,
             channel_state: ChannelState::UnAssigned,
-            device_number,
-            transmission_type,
             state_config: StateConfig {
-                device_number,
-                transmission_type,
-                network_key_index: ant_plus_key_index,
-                profile_reference,
+                device_number: channel_config.device_number,
+                device_type: DeviceType::new(channel_config.device_type.into(), false),
+                transmission_type: channel_config.transmission_type,
+                channel_config: *channel_config,
             },
             tx_channel_id_request: false,
         }
+        // TODO decide if we want to do check on the radio behalf for invalid config (e.g. wildcard
+        // master)
     }
 
     pub fn get_channel(&self) -> ChannelAssignment {
@@ -381,7 +342,7 @@ impl<'a> MessageHandler<'a> {
     ///
     /// Master channels: returns the ID being broadcasted
     pub fn get_device_id(&self) -> u16 {
-        self.device_number
+        self.state_config.device_number
     }
 
     pub fn is_tracking(&self) -> bool {
@@ -437,10 +398,10 @@ impl<'a> MessageHandler<'a> {
                     channel,
                     self.state_config.device_number,
                     DeviceType::new(
-                        self.state_config.profile_reference.device_type.into(),
+                        self.state_config.channel_config.device_type.into(),
                         bit_state,
                     ),
-                    transmission_type_from_state(self),
+                    self.state_config.transmission_type,
                 )
                 .into(),
             );
@@ -522,8 +483,9 @@ impl<'a> MessageHandler<'a> {
             self.configure_state = &DONE_STATE;
             self.configure_pending_response = false;
         }
-        self.device_number = msg.device_number;
-        self.transmission_type = msg.transmission_type.into();
+        self.state_config.device_number = msg.device_number;
+        self.state_config.device_type = msg.device_type;
+        self.state_config.transmission_type = msg.transmission_type;
         Ok(())
     }
 
@@ -534,7 +496,7 @@ impl<'a> MessageHandler<'a> {
     /// cleared
     pub fn set_pairing_bit(&mut self, state: bool) -> Result<(), ConfigureError> {
         if matches!(
-            self.state_config.profile_reference.channel_type,
+            self.state_config.channel_config.channel_type,
             ChannelType::BidirectionalSlave
                 | ChannelType::SharedBidirectionalSlave
                 | ChannelType::SharedReceiveOnly
@@ -575,8 +537,8 @@ impl<'a> MessageHandler<'a> {
         self.tx_ready = true;
         self.channel_state = ChannelState::UnAssigned;
         if reset_id_data {
-            self.device_number = self.state_config.device_number;
-            self.transmission_type = self.state_config.transmission_type;
+            self.state_config.device_number = self.state_config.device_number;
+            self.state_config.transmission_type = self.state_config.transmission_type;
         }
     }
 }
@@ -585,17 +547,25 @@ impl<'a> MessageHandler<'a> {
 mod tests {
     use super::*;
     use crate::channel::duration_to_search_timeout;
+    use crate::messages::config::{TransmissionChannelType, TransmissionGlobalDataPages};
     use crate::messages::{RxMessageHeader, RxSyncByte, TransmitableMessage};
     use core::time::Duration;
-    const TEST_REFERENCE: ProfileReference = ProfileReference {
-        device_type: 5,
-        transmission_channel_type: TransmissionChannelType::IndependentChannel,
-        global_datapages_used: TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
-        channel_type: ChannelType::BidirectionalSlave,
-        radio_frequency: 25,
-        timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
-        channel_period: 123,
-    };
+    fn get_config() -> ChannelConfig {
+        ChannelConfig {
+            device_number: 1234,
+            network_key_index: 0,
+            device_type: 5,
+            transmission_type: TransmissionType::new(
+                TransmissionChannelType::IndependentChannel,
+                TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+                12.into(),
+            ),
+            channel_type: ChannelType::BidirectionalSlave,
+            radio_frequency: 25,
+            timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
+            channel_period: 123,
+        }
+    }
 
     fn get_response_ok(id: TxMessageId) -> AntMessage {
         AntMessage {
@@ -628,23 +598,13 @@ mod tests {
 
     #[test]
     fn inert_start() {
-        let mut msg_handler = MessageHandler::new(
-            1234,
-            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
-            0,
-            &TEST_REFERENCE,
-        );
+        let mut msg_handler = MessageHandler::new(&get_config());
         assert!(msg_handler.send_message().is_none());
     }
 
     #[test]
     fn assign_config() {
-        let mut msg_handler = MessageHandler::new(
-            1234,
-            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
-            0,
-            &TEST_REFERENCE,
-        );
+        let mut msg_handler = MessageHandler::new(&get_config());
         msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::AssignChannel);
         if let TxMessage::AssignChannel(data) = data {
@@ -659,12 +619,7 @@ mod tests {
 
     #[test]
     fn close_state() {
-        let mut msg_handler = MessageHandler::new(
-            1234,
-            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
-            0,
-            &TEST_REFERENCE,
-        );
+        let mut msg_handler = MessageHandler::new(&get_config());
         msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::CloseChannel);
         if let TxMessage::CloseChannel(data) = data {
@@ -676,12 +631,7 @@ mod tests {
 
     #[test]
     fn unassign_state() {
-        let mut msg_handler = MessageHandler::new(
-            1234,
-            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
-            0,
-            &TEST_REFERENCE,
-        );
+        let mut msg_handler = MessageHandler::new(&get_config());
         msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::UnAssignChannel);
         if let TxMessage::UnAssignChannel(data) = data {
@@ -693,12 +643,7 @@ mod tests {
 
     #[test]
     fn channel_id_state() {
-        let mut msg_handler = MessageHandler::new(
-            1234,
-            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
-            0,
-            &TEST_REFERENCE,
-        );
+        let mut msg_handler = MessageHandler::new(&get_config());
         msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::ChannelId);
         if let TxMessage::ChannelId(data) = data {
@@ -720,12 +665,7 @@ mod tests {
 
     #[test]
     fn channel_frequency_state() {
-        let mut msg_handler = MessageHandler::new(
-            1234,
-            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
-            0,
-            &TEST_REFERENCE,
-        );
+        let mut msg_handler = MessageHandler::new(&get_config());
         msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::ChannelRfFrequency);
         if let TxMessage::ChannelRfFrequency(data) = data {
@@ -738,12 +678,7 @@ mod tests {
 
     #[test]
     fn channel_period_state() {
-        let mut msg_handler = MessageHandler::new(
-            1234,
-            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
-            0,
-            &TEST_REFERENCE,
-        );
+        let mut msg_handler = MessageHandler::new(&get_config());
         msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::ChannelPeriod);
         if let TxMessage::ChannelPeriod(data) = data {
@@ -756,12 +691,7 @@ mod tests {
 
     #[test]
     fn search_timeout_state() {
-        let mut msg_handler = MessageHandler::new(
-            1234,
-            TransmissionTypeAssignment::DeviceNumberExtension(12.into()),
-            0,
-            &TEST_REFERENCE,
-        );
+        let mut msg_handler = MessageHandler::new(&get_config());
         msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::SearchTimeout);
         if let TxMessage::SearchTimeout(data) = data {
