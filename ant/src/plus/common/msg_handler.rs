@@ -537,8 +537,12 @@ impl MessageHandler {
         self.tx_ready = true;
         self.channel_state = ChannelState::UnAssigned;
         if reset_id_data {
-            self.state_config.device_number = self.state_config.device_number;
-            self.state_config.transmission_type = self.state_config.transmission_type;
+            self.state_config.device_number = self.state_config.channel_config.device_number;
+            self.state_config.transmission_type =
+                self.state_config.channel_config.transmission_type;
+            self.state_config.device_type =
+                DeviceType::new(self.state_config.channel_config.device_type.into(), false);
+            self.pairing_request = DevicePairingState::BitCleared;
         }
     }
 }
