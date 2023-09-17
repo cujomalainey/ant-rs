@@ -19,6 +19,8 @@ pub use monitor::*;
 use crate::plus::common::datapages::{ModeSettings, RequestDataPage};
 use crate::plus::common::msg_handler::StateError;
 
+const DEVICE_TYPE: u8 = 120;
+
 #[derive(Debug, Default)]
 pub enum Period {
     #[default]
@@ -38,7 +40,7 @@ impl From<Period> for u16 {
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]
-pub enum MonitorTxDataPages {
+pub enum MonitorTxDataPage {
     DefaultDataPage(DefaultDataPage),
     CumulativeOperatingTime(CumulativeOperatingTime),
     ManufacturerInformation(ManufacturerInformation),
@@ -51,7 +53,7 @@ pub enum MonitorTxDataPages {
     ManufacturerSpecific(ManufacturerSpecific),
 }
 
-pub enum DisplayTxDataPages {
+pub enum DisplayTxDataPage {
     HRFeatureCommand(HRFeatureCommand),
     RequestDataPage(RequestDataPage),
     ModeSettings(ModeSettings),

@@ -15,8 +15,9 @@ use crate::plus::common::datapages::MANUFACTURER_SPECIFIC_RANGE;
 use crate::plus::common::msg_handler::{ChannelConfig, MessageHandler};
 use crate::plus::profiles::heart_rate::{
     BatteryStatus, Capabilities, CumulativeOperatingTime, DataPageNumbers, DefaultDataPage,
-    DeviceInformation, Error, ManufacturerInformation, ManufacturerSpecific, MonitorTxDataPages,
-    PreviousHeartBeat, ProductInformation, SwimIntervalSummary, DATA_PAGE_NUMBER_MASK,
+    DeviceInformation, Error, ManufacturerInformation, ManufacturerSpecific, MonitorTxDataPage,
+    Period, PreviousHeartBeat, ProductInformation, SwimIntervalSummary, DATA_PAGE_NUMBER_MASK,
+    DEVICE_TYPE,
 };
 use crate::plus::NETWORK_RF_FREQUENCY;
 
@@ -28,17 +29,21 @@ use std::time::Duration;
 pub struct Display {
     msg_handler: MessageHandler,
     rx_message_callback: Option<fn(&AntMessage)>,
-    rx_datapage_callback: Option<fn(Result<MonitorTxDataPages, Error>)>,
+    rx_datapage_callback: Option<fn(Result<MonitorTxDataPage, Error>)>,
     tx_message_callback: Option<fn() -> Option<TxMessageChannelConfig>>,
     tx_datapage_callback: Option<fn() -> Option<TxMessageData>>,
 }
 
 impl Display {
-    pub fn new(device: Option<(u16, Integer<u8, Bits<4>>)>, ant_plus_key_index: u8, period: Period) -> Self {
+    pub fn new(
+        device: Option<(u16, Integer<u8, Bits<4>>)>,
+        ant_plus_key_index: u8,
+        period: Period,
+    ) -> Self {
         let (device_number, transmission_type_extension) = device.unwrap_or((0, 0.into()));
         let channel_config = ChannelConfig {
             device_number,
-            device_type: 120,
+            device_type: DEVICE_TYPE,
             channel_type: ChannelType::BidirectionalSlave,
             network_key_index: ant_plus_key_index,
             transmission_type: TransmissionType::new(
@@ -75,8 +80,16 @@ impl Display {
         self.rx_message_callback = f;
     }
 
-    pub fn set_rx_datapage_callback(&mut self, f: Option<fn(Result<MonitorTxDataPages, Error>)>) {
+    pub fn set_rx_datapage_callback(&mut self, f: Option<fn(Result<MonitorTxDataPage, Error>)>) {
         self.rx_datapage_callback = f;
+    }
+
+    pub fn set_tx_message_callback(&mut self, f: Option<fn() -> Option<TxMessageChannelConfig>>) {
+        self.tx_message_callback = f;
+    }
+
+    pub fn set_tx_datapage_callback(&mut self, f: Option<fn() -> Option<TxMessageData>>) {
+        self.tx_datapage_callback = f;
     }
 
     pub fn reset_state(&mut self) {
@@ -91,40 +104,40 @@ impl Display {
         }
     }
 
-    fn parse_dp(&mut self, data: &[u8; 8]) -> Result<MonitorTxDataPages, Error> {
+    fn parse_dp(&mut self, data: &[u8; 8]) -> Result<MonitorTxDataPage, Error> {
         let dp_num = data[0] & DATA_PAGE_NUMBER_MASK;
         if let Some(dp) = DataPageNumbers::from_primitive(dp_num) {
             let parsed = match dp {
                 DataPageNumbers::DefaultDataPage => {
-                    MonitorTxDataPages::DefaultDataPage(DefaultDataPage::unpack(data)?)
+                    MonitorTxDataPage::DefaultDataPage(DefaultDataPage::unpack(data)?)
                 }
                 DataPageNumbers::CumulativeOperatingTime => {
-                    MonitorTxDataPages::CumulativeOperatingTime(CumulativeOperatingTime::unpack(
+                    MonitorTxDataPage::CumulativeOperatingTime(CumulativeOperatingTime::unpack(
                         data,
                     )?)
                 }
                 DataPageNumbers::ManufacturerInformation => {
-                    MonitorTxDataPages::ManufacturerInformation(ManufacturerInformation::unpack(
+                    MonitorTxDataPage::ManufacturerInformation(ManufacturerInformation::unpack(
                         data,
                     )?)
                 }
                 DataPageNumbers::ProductInformation => {
-                    MonitorTxDataPages::ProductInformation(ProductInformation::unpack(data)?)
+                    MonitorTxDataPage::ProductInformation(ProductInformation::unpack(data)?)
                 }
                 DataPageNumbers::PreviousHeartBeat => {
-                    MonitorTxDataPages::PreviousHeartBeat(PreviousHeartBeat::unpack(data)?)
+                    MonitorTxDataPage::PreviousHeartBeat(PreviousHeartBeat::unpack(data)?)
                 }
                 DataPageNumbers::SwimIntervalSummary => {
-                    MonitorTxDataPages::SwimIntervalSummary(SwimIntervalSummary::unpack(data)?)
+                    MonitorTxDataPage::SwimIntervalSummary(SwimIntervalSummary::unpack(data)?)
                 }
                 DataPageNumbers::Capabilities => {
-                    MonitorTxDataPages::Capabilities(Capabilities::unpack(data)?)
+                    MonitorTxDataPage::Capabilities(Capabilities::unpack(data)?)
                 }
                 DataPageNumbers::BatteryStatus => {
-                    MonitorTxDataPages::BatteryStatus(BatteryStatus::unpack(data)?)
+                    MonitorTxDataPage::BatteryStatus(BatteryStatus::unpack(data)?)
                 }
                 DataPageNumbers::DeviceInformation => {
-                    MonitorTxDataPages::DeviceInformation(DeviceInformation::unpack(data)?)
+                    MonitorTxDataPage::DeviceInformation(DeviceInformation::unpack(data)?)
                 }
                 // Add all valid profile specific pages below if they are invalid in this direction
                 DataPageNumbers::HRFeatureCommand => {
@@ -134,7 +147,7 @@ impl Display {
             return Ok(parsed);
         }
         if MANUFACTURER_SPECIFIC_RANGE.contains(&dp_num) {
-            return Ok(MonitorTxDataPages::ManufacturerSpecific(
+            return Ok(MonitorTxDataPage::ManufacturerSpecific(
                 ManufacturerSpecific::unpack(data)?,
             ));
         }
