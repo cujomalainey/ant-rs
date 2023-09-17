@@ -34,7 +34,7 @@ pub struct Display {
 }
 
 impl Display {
-    pub fn new(device: Option<(u16, Integer<u8, Bits<4>>)>, ant_plus_key_index: u8) -> Self {
+    pub fn new(device: Option<(u16, Integer<u8, Bits<4>>)>, ant_plus_key_index: u8, period: Period) -> Self {
         let (device_number, transmission_type_extension) = device.unwrap_or((0, 0.into()));
         let channel_config = ChannelConfig {
             device_number,
@@ -48,7 +48,7 @@ impl Display {
             ),
             radio_frequency: NETWORK_RF_FREQUENCY,
             timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
-            channel_period: 8070,
+            channel_period: period.into(),
         };
         Self {
             rx_message_callback: None,

@@ -6,6 +6,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+//! Based off V2.5 of the Heart Rate specification
+
 mod datapages;
 mod display;
 mod monitor;
@@ -21,7 +23,18 @@ use crate::plus::common::msg_handler::StateError;
 pub enum Period {
     #[default]
     FourHz,
-    HalfHz,
+    TwoHz,
+    OneHz,
+}
+
+impl From<Period> for u16 {
+    fn from(p: Period) -> u16 {
+        match p {
+            Period::FourHz => 8070,
+            Period::TwoHz => 16140,
+            Period::OneHz => 32280,
+        }
+    }
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]

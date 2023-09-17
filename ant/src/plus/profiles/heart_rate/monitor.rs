@@ -60,7 +60,8 @@ impl Monitor {
                 ), // TODO set from config
                 radio_frequency: NETWORK_RF_FREQUENCY,
                 timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
-                channel_period: 8070,
+                channel_period: Period::FourHz.into(), // Monitor always uses 4Hz, display may use
+                                                       // less
             }),
         }
     }
