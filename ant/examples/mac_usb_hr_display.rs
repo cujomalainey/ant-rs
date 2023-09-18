@@ -8,7 +8,7 @@
 
 use ant::drivers::{is_ant_usb_device_from_device, UsbDriver};
 use ant::messages::config::SetNetworkKey;
-use ant::plus::profiles::heart_rate::HeartRateDisplay;
+use ant::plus::profiles::heart_rate::{Display, Period};
 use ant::router::Router;
 use dialoguer::Select;
 use rusb::{Device, DeviceList};
@@ -48,7 +48,7 @@ fn main() -> std::io::Result<()> {
     let mut router = Router::new(driver).unwrap();
     let snk = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // Get this from thisisant.com
     router.send(&snk).expect("failed to set network key");
-    let hr = Rc::new(RefCell::new(HeartRateDisplay::new(None, 0)));
+    let hr = Rc::new(RefCell::new(Display::new(None, 0, Period::FourHz)));
     hr.borrow_mut()
         .set_rx_datapage_callback(Some(|x| println!("{:#?}", x)));
     hr.borrow_mut()
