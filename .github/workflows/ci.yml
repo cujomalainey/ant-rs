@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo install afl
+      - run: cargo install cargo-afl
       - run: cargo build --release --workspace --exclude serial-fuzz-target
       - run: cargo build --release --no-default-features --workspace --exclude serial-fuzz-target
       - run: cargo afl build --package serial-fuzz-target
