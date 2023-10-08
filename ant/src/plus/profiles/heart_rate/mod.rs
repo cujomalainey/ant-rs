@@ -53,6 +53,7 @@ pub enum MonitorTxDataPage {
     ManufacturerSpecific(ManufacturerSpecific),
 }
 
+#[derive(PartialEq, Copy, Clone, Debug)]
 pub enum DisplayTxDataPage {
     HRFeatureCommand(HRFeatureCommand),
     RequestDataPage(RequestDataPage),

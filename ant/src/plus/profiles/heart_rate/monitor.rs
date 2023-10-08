@@ -79,6 +79,7 @@ pub enum TxDatapage {
     PreviousHeartBeat(),
     SwimIntervalSummary(),
     Capabilities(),
+    ManufacturerSpecific(u8),
 }
 
 impl Monitor {

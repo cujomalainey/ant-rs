@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::messages::{TransmitableMessage, TxMessage, TxMessageId};
+use crate::messages::{TransmitableMessage, TxMessage, TxMessageData, TxMessageId};
 use arrayvec::ArrayVec;
 use const_utils::{max, min};
 use derive_new::new;
@@ -277,6 +277,12 @@ impl From<BroadcastData> for TxMessage {
     }
 }
 
+impl From<BroadcastData> for TxMessageData {
+    fn from(msg: BroadcastData) -> TxMessageData {
+        TxMessageData::BroadcastData(msg)
+    }
+}
+
 impl BroadcastData {
     /// Constructs a new `BroadcastData`.
     pub fn new(channel_number: u8, data: [u8; 8]) -> Self {
@@ -328,6 +334,12 @@ impl TransmitableMessage for AcknowledgedData {
 impl From<AcknowledgedData> for TxMessage {
     fn from(msg: AcknowledgedData) -> TxMessage {
         TxMessage::AcknowledgedData(msg)
+    }
+}
+
+impl From<AcknowledgedData> for TxMessageData {
+    fn from(msg: AcknowledgedData) -> TxMessageData {
+        TxMessageData::AcknowledgedData(msg)
     }
 }
 
