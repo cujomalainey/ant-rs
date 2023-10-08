@@ -45,6 +45,7 @@ jobs:
       - run: cargo build --example linux_usb --no-default-features --features "alloc std"
       - run: cargo build --example mac_usb
       - run: cargo build --example mac_usb_hr_display
+      - run: cargo build --example mac_usb_hr_monitor
       - run: cargo build --example mac_usb_tx
       - run: cargo build --example no_std_ant --no-default-features
   test:
