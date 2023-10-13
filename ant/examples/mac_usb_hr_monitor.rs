@@ -8,8 +8,6 @@
 
 use ant::drivers::{is_ant_usb_device_from_device, UsbDriver};
 use ant::messages::config::SetNetworkKey;
-use ant::messages::data::{AcknowledgedData, BroadcastData};
-use ant::messages::TxMessageData;
 use ant::plus::profiles::heart_rate::{
     Capabilities, CommonData, Config, Features, MainDataPage, ManufacturerInformation,
     ManufacturerSpecific, Monitor, PreviousHeartBeat, ProductInformation, TxDatapage,
@@ -25,8 +23,8 @@ use std::rc::Rc;
 
 // This function creates datapages for the purposes of this example, the generated datapages are
 // not to spec in any form or fashion and are strictly here to show how generation works
-fn make_datapage(dp: &TxDatapage, acknowledged_requested: bool) -> TxMessageData {
-    let data = match dp {
+fn make_datapage(dp: &TxDatapage) -> [u8; 8] {
+    match dp {
         TxDatapage::ManufacturerInformation() => {
             ManufacturerInformation::new(false, 0xff, 0xffff, CommonData::new(1234, 123, 60)).pack()
         }
@@ -52,13 +50,7 @@ fn make_datapage(dp: &TxDatapage, acknowledged_requested: bool) -> TxMessageData
         .pack(),
         _ => panic!("Datapage implementation missing"),
     }
-    .unwrap();
-    // Channel number will be overridden by the profile with the correct value
-    if acknowledged_requested {
-        AcknowledgedData::new(0, data).into()
-    } else {
-        BroadcastData::new(0, data).into()
-    }
+    .unwrap()
 }
 
 fn main() -> std::io::Result<()> {
@@ -102,12 +94,13 @@ fn main() -> std::io::Result<()> {
         swim_mode_supported: false,
         gym_mode_supported: false,
         number_manufacturer_pages: 2,
+        background_page_interval: 64,
     };
     let hr = Rc::new(RefCell::new(Monitor::new(
         config,
         0,
         |x| println!("{:#?}", x),
-        |datapage, acknowledged_requested| make_datapage(datapage, acknowledged_requested),
+        |datapage| make_datapage(datapage),
     )));
     // hr.borrow_mut()
     //     .set_rx_datapage_callback(Some(|x| println!("{:#?}", x)));

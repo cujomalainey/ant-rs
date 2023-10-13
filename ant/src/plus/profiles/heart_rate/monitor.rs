@@ -10,7 +10,8 @@ use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
 use crate::messages::config::{
     ChannelType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
 };
-use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig, TxMessageData};
+use crate::messages::data::BroadcastData;
+use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig};
 use crate::plus::common::datapages::{
     DataPageNumbers as CommonDataPageNumbers, ModeSettings, RequestDataPage,
     MANUFACTURER_SPECIFIC_RANGE,
@@ -50,10 +51,30 @@ pub struct Config {
     pub gym_mode_supported: bool,
     /// Total number of manufacturer pages, this is used in secondary page pattern computing
     pub number_manufacturer_pages: u8,
+    /// Number of main pages to send before a background cycle, must be <=65 to be spec compliant
+    pub background_page_interval: u8,
 }
 
 type RxDataPageCallback = fn(Result<DisplayTxDataPage, Error>);
-type TxDatapageCallback = fn(&TxDatapage, acknowledged_requested: bool) -> TxMessageData;
+type TxDatapageCallback = fn(&TxDatapage) -> [u8; 8];
+
+/// Collection of datapge transmission state variables
+struct PageState {
+    count: u8,
+    background_count: u8,
+    weave_count: u8,
+}
+
+const WEAVE_PATTERN: [TxDatapage; 8] = [
+    TxDatapage::ManufacturerInformation(),
+    TxDatapage::ManufacturerInformation(),
+    TxDatapage::SwimIntervalSummary(),
+    TxDatapage::ManufacturerInformation(),
+    TxDatapage::SwimIntervalSummary(),
+    TxDatapage::SwimIntervalSummary(),
+    TxDatapage::ManufacturerInformation(),
+    TxDatapage::SwimIntervalSummary(),
+];
 
 /// A heart rate sensor channel configuration
 ///
@@ -69,8 +90,10 @@ pub struct Monitor {
     in_gym_mode: bool,
     in_swim_mode: bool,
     config: Config,
+    page_state: PageState,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TxDatapage {
     DefaultDataPage(),
     CumulativeOperatingTime(),
@@ -79,6 +102,7 @@ pub enum TxDatapage {
     PreviousHeartBeat(),
     SwimIntervalSummary(),
     Capabilities(),
+    BatteryStatus(),
     ManufacturerSpecific(u8),
 }
 
@@ -112,6 +136,11 @@ impl Monitor {
             config,
             in_gym_mode: false,
             in_swim_mode: false,
+            page_state: PageState {
+                count: 0,
+                background_count: 0,
+                weave_count: 0,
+            },
         }
     }
 
@@ -216,8 +245,78 @@ impl Monitor {
         Err(Error::UnsupportedDataPage(dp_num))
     }
 
+    // Parses current config to identify main datapage, exlcuding manufacturer information in gym
+    // mode case
+    fn get_main_page(&mut self) -> TxDatapage {
+        if self.in_gym_mode {
+            if self.in_swim_mode {
+                // do interleaved mainpage
+                let count = self.page_state.weave_count;
+                self.page_state.weave_count = if count >= 7 { 0 } else { count + 1 };
+                WEAVE_PATTERN[count as usize]
+            } else {
+                TxDatapage::ManufacturerInformation()
+            }
+        } else if self.in_swim_mode {
+            TxDatapage::SwimIntervalSummary()
+        } else {
+            match self.config.main_data_page {
+                MainDataPage::DefaultDataPage => TxDatapage::DefaultDataPage(),
+                MainDataPage::PreviousHeartBeat => TxDatapage::PreviousHeartBeat(),
+            }
+        }
+    }
+
+    // returns current background page based on background_count, resets count if exceeds value
+    //
+    // works by incrementing cumulative offset on each optional page to create slices in the count
+    fn get_secondary_page(&mut self) -> TxDatapage {
+        let count = self.page_state.background_count;
+        let mut offset = 0;
+        if self.config.cumulative_operating_time_supported {
+            if count == 0 {
+                return TxDatapage::CumulativeOperatingTime();
+            }
+            // optional, increase offset if enabled
+            offset += 1;
+        }
+        if count == offset {
+            return TxDatapage::ManufacturerInformation();
+        } else if count == 1 + offset {
+            return TxDatapage::ProductInformation();
+        } else if count == 2 + offset {
+            return TxDatapage::Capabilities();
+        }
+        if self.config.battery_status_supported {
+            if count == 3 + offset {
+                return TxDatapage::BatteryStatus();
+            }
+            offset += 1;
+        }
+        if count - 3 - offset < self.config.number_manufacturer_pages {
+            TxDatapage::ManufacturerSpecific(count - 3 - offset)
+        } else {
+            self.page_state.background_count = 0;
+            self.get_secondary_page()
+        }
+    }
+
+    // Datapage sequence state machine
     fn get_next_datapage(&mut self) -> TxDatapage {
-        todo!();
+        let count = self.page_state.count;
+        self.page_state.count += 1;
+        if count < self.config.background_page_interval {
+            // return main page for first n counts
+            self.get_main_page()
+        } else if count < self.config.background_page_interval + 4 {
+            // return secondary page for 4 counts
+            self.get_secondary_page()
+        } else {
+            // recurse with new state
+            self.page_state.count = 0;
+            self.page_state.background_count += 1;
+            self.get_next_datapage()
+        }
     }
 }
 
@@ -259,8 +358,7 @@ impl Channel for Monitor {
         if self.msg_handler.is_tx_ready() {
             let callback = self.tx_datapage_callback;
             let dp = self.get_next_datapage();
-            let mut msg = callback(&dp, false); // TODO handle ack param
-            msg.set_channel(channel);
+            let msg = BroadcastData::new(channel, callback(&dp)); // TODO handle ack param
             self.msg_handler.tx_sent();
             return Some(msg.into());
         }
