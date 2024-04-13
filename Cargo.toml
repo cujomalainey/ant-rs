@@ -5,3 +5,4 @@ members = [
     "ant-sys",
     "serial-fuzz-target",
 ]
+resolver = "2"
