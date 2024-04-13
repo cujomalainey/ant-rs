@@ -30,14 +30,14 @@ use crate::messages::{
 };
 
 use arrayvec::{ArrayVec, CapacityError};
-use embedded_hal::digital::v2::PinState;
+use embedded_hal::digital::PinState;
 use packed_struct::prelude::{PackedStructSlice, PackingError};
 use std::array::TryFromSliceError;
 use std::cmp;
 
-pub trait Driver<R, W> {
-    fn get_message(&mut self) -> Result<Option<AntMessage>, DriverError<R, W>>;
-    fn send_message(&mut self, msg: &dyn TransmitableMessage) -> Result<(), DriverError<R, W>>;
+pub trait Driver<E> {
+    fn get_message(&mut self) -> Result<Option<AntMessage>, DriverError<E>>;
+    fn send_message(&mut self, msg: &dyn TransmitableMessage) -> Result<(), DriverError<E>>;
 }
 
 // TODO finalize
@@ -45,9 +45,8 @@ const ANT_MESSAGE_SIZE: usize = MAX_MESSAGE_DATA_SIZE;
 const CHECKSUM_SIZE: usize = 1;
 
 #[derive(Debug)]
-pub enum DriverError<R, W> {
-    ReadError(nb::Error<R>),
-    WriteError(nb::Error<W>),
+pub enum DriverError<E> {
+    SystemError(nb::Error<E>),
     BadChecksum(u8, u8),
     BadLength(usize, usize),
     PackingError(PackingError),
@@ -59,26 +58,26 @@ pub enum DriverError<R, W> {
     PinChangeBug(PinState), // TODO update this to use the type provided by the pin trait
 }
 
-impl<R, W> std::cmp::PartialEq for DriverError<R, W> {
+impl<E> std::cmp::PartialEq for DriverError<E> {
     fn eq(&self, other: &Self) -> bool {
         use std::mem::discriminant;
         discriminant(self) == discriminant(other)
     }
 }
 
-impl<R, W> From<packed_struct::PackingError> for DriverError<R, W> {
+impl<E> From<packed_struct::PackingError> for DriverError<E> {
     fn from(err: packed_struct::PackingError) -> Self {
         DriverError::PackingError(err)
     }
 }
 
-impl<R, W> From<TryFromSliceError> for DriverError<R, W> {
+impl<E> From<TryFromSliceError> for DriverError<E> {
     fn from(err: TryFromSliceError) -> Self {
         DriverError::SliceError(err)
     }
 }
 
-impl<R, W> From<arrayvec::CapacityError> for DriverError<R, W> {
+impl<E> From<arrayvec::CapacityError> for DriverError<E> {
     fn from(err: arrayvec::CapacityError) -> Self {
         DriverError::CapacityError(err)
     }
@@ -100,7 +99,7 @@ fn align_buffer(buf: &[u8]) -> usize {
     0
 }
 
-fn update_buffer<R, W>(msg: &Result<Option<AntMessage>, DriverError<R, W>>, buf: &[u8]) -> usize {
+fn update_buffer<E>(msg: &Result<Option<AntMessage>, DriverError<E>>, buf: &[u8]) -> usize {
     if msg.is_err() {
         // It was a corrupted message, skip first byte to resposition buf and move on
         return 1;
@@ -139,7 +138,7 @@ const HEADER_SIZE: usize = 3;
 
 type Buffer = ArrayVec<u8, ANT_MESSAGE_SIZE>;
 
-fn parse_buffer<R, W>(buf: &[u8]) -> Result<Option<AntMessage>, DriverError<R, W>> {
+fn parse_buffer<E>(buf: &[u8]) -> Result<Option<AntMessage>, DriverError<E>> {
     // Not enough bytes
     if buf.len() < HEADER_SIZE {
         return Ok(None);

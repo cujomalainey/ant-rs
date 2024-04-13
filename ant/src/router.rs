@@ -37,18 +37,17 @@ pub const MAX_CHANNELS: usize = 15;
 
 type SharedChannel = Rc<RefCell<dyn Channel>>;
 
-pub struct Router<R, W, D: Driver<R, W>> {
+pub struct Router<E, D: Driver<E>> {
     channels: [Option<SharedChannel>; MAX_CHANNELS],
     max_channels: Cell<usize>, // what the hardware reports as some have less than max
     driver: D,
     reset_restore: Cell<bool>,
     rx_message_callback: Option<fn(&AntMessage)>,
-    _read_marker: PhantomData<R>,
-    _write_marker: PhantomData<W>,
+    _marker: PhantomData<E>,
 }
 
-impl<R, W> From<DriverError<R, W>> for RouterError {
-    fn from(_err: DriverError<R, W>) -> Self {
+impl<E> From<DriverError<E>> for RouterError {
+    fn from(_err: DriverError<E>) -> Self {
         // TODO encapsilate error
         RouterError::DriverError()
     }
@@ -56,7 +55,7 @@ impl<R, W> From<DriverError<R, W>> for RouterError {
 
 const ROUTER_CAPABILITIES_RETRIES: u8 = 25;
 
-impl<R, W, D: Driver<R, W>> Router<R, W, D> {
+impl<E, D: Driver<E>> Router<E, D> {
     pub fn new(mut driver: D) -> Result<Self, RouterError> {
         // Reset system so we are coherent
         driver.send_message(&ResetSystem::new())?;
@@ -77,8 +76,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
             reset_restore: Cell::new(false),
             driver,
             rx_message_callback: None,
-            _read_marker: PhantomData,
-            _write_marker: PhantomData,
+            _marker: PhantomData,
         };
         // If we don't get a response within 25ms give up
         let mut i = 0;
@@ -131,7 +129,7 @@ impl<R, W, D: Driver<R, W>> Router<R, W, D> {
     ///
     /// If you think the radio is not responding it is best to [Router::release] the driver and issue a
     /// reset via a hardware mechanism then rebuild.
-    pub fn reset(&mut self, restore: bool) -> Result<(), DriverError<R, W>> {
+    pub fn reset(&mut self, restore: bool) -> Result<(), DriverError<E>> {
         self.driver.send_message(&ResetSystem::new())?;
         self.reset_restore.set(restore);
         if !restore {

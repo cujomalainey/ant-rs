@@ -11,9 +11,9 @@ use crate::drivers::{
     ANT_MESSAGE_SIZE,
 };
 use crate::messages::{AntMessage, TransmitableMessage};
-use embedded_hal::digital::v2::{OutputPin, PinState};
-use embedded_hal::serial::Read;
-use embedded_hal::serial::Write;
+use embedded_hal::digital::{ErrorType, OutputPin, PinState};
+use embedded_hal_nb::serial::Read;
+use embedded_hal_nb::serial::Write;
 use nb;
 
 pub struct SerialDriver<SERIAL, PIN> {
@@ -40,12 +40,12 @@ where
     }
 }
 
-impl<SERIAL, SLEEP, R, W> Driver<R, W> for SerialDriver<SERIAL, SLEEP>
+impl<SERIAL, SLEEP> Driver<SERIAL::Error> for SerialDriver<SERIAL, SLEEP>
 where
-    SERIAL: Read<u8, Error = R> + Write<u8, Error = W>,
+    SERIAL: Read<u8> + Write<u8>,
     SLEEP: OutputPin,
 {
-    fn get_message(&mut self) -> Result<Option<AntMessage>, DriverError<R, W>> {
+    fn get_message(&mut self) -> Result<Option<AntMessage>, DriverError<SERIAL::Error>> {
         let buf = &mut self.buffer;
 
         loop {
@@ -53,7 +53,7 @@ where
             match data {
                 Ok(d) => buf.push(d),
                 Err(nb::Error::WouldBlock) => break,
-                Err(e) => return Err(DriverError::ReadError(e)),
+                Err(e) => return Err(DriverError::SystemError(e)),
             }
 
             if buf.is_full() {
@@ -70,7 +70,10 @@ where
         msg_result
     }
 
-    fn send_message(&mut self, msg: &dyn TransmitableMessage) -> Result<(), DriverError<R, W>> {
+    fn send_message(
+        &mut self,
+        msg: &dyn TransmitableMessage,
+    ) -> Result<(), DriverError<SERIAL::Error>> {
         // TODO update with variable sized buf
         // TODO fix io error propotation
         let mut buf: [u8; ANT_MESSAGE_SIZE] = [0; ANT_MESSAGE_SIZE];
@@ -87,12 +90,12 @@ where
         // TODO handle case where driver is full, flush and keep going or switch to blocking API
         for byte in buf_slice.iter() {
             if let Err(e) = self.serial.write(*byte) {
-                return Err(DriverError::WriteError(e));
+                return Err(DriverError::SystemError(e));
             }
         }
 
         if let Err(e) = self.serial.flush() {
-            return Err(DriverError::WriteError(e));
+            return Err(DriverError::SystemError(e));
         }
 
         if let Some(pin) = &mut self.sleep {
@@ -111,8 +114,13 @@ where
 /// includes USB use cases
 pub struct StubPin {}
 
+pub enum StubError {}
+
+impl ErrorType for StubPin {
+    type Error = core::convert::Infallible;
+}
+
 impl OutputPin for StubPin {
-    type Error = u8;
     fn set_low(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -130,15 +138,11 @@ mod tests {
     };
     use crate::messages::requested_response::{ChannelId, ChannelState, ChannelStatus};
     use crate::messages::{RxMessage, RxMessageHeader, RxMessageId, RxSyncByte};
+    use embedded_hal_nb::serial;
 
     enum TestData {
         Data(Vec<u8>),
-        Error(nb::Error<SerialError>),
-    }
-
-    #[derive(Debug, PartialEq, Clone, Copy)]
-    enum SerialError {
-        A,
+        Error(nb::Error<serial::ErrorKind>),
     }
 
     struct ValidationContext {
@@ -153,10 +157,12 @@ mod tests {
         }
     }
 
-    impl Read<u8> for ValidationContext {
-        type Error = SerialError;
+    impl serial::ErrorType for ValidationContext {
+        type Error = serial::ErrorKind;
+    }
 
-        fn read(&mut self) -> Result<u8, nb::Error<SerialError>> {
+    impl Read<u8> for ValidationContext {
+        fn read(&mut self) -> Result<u8, nb::Error<serial::ErrorKind>> {
             let first = match self.in_bytes.get_mut(0) {
                 Some(x) => x,
                 None => return Err(nb::Error::WouldBlock),
@@ -180,8 +186,6 @@ mod tests {
     }
 
     impl Write<u8> for ValidationContext {
-        type Error = SerialError;
-
         fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
             let first = self.out_bytes.get_mut(0).unwrap();
             match first {
@@ -223,16 +227,13 @@ mod tests {
         [2, 3, 4, 5, 6].iter().for_each(|x| buf.push(*x));
         assert_eq!(
             1,
-            update_buffer::<SerialError, SerialError>(
-                &Err(DriverError::BadChecksum(0, 0)),
-                &mut buf
-            )
+            update_buffer::<serial::ErrorKind>(&Err(DriverError::BadChecksum(0, 0)), &mut buf)
         );
         buf.clear();
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
             .iter()
             .for_each(|x| buf.push(*x));
-        let remove = update_buffer::<SerialError, SerialError>(
+        let remove = update_buffer::<serial::ErrorKind>(
             &Ok(Some(AntMessage {
                 header: RxMessageHeader {
                     sync: RxSyncByte::Write,
@@ -252,7 +253,7 @@ mod tests {
         assert_eq!(remove, 10);
         buf.clear();
         [2, 3, 4, 5, 6, 7].iter().for_each(|x| buf.push(*x));
-        update_buffer::<SerialError, SerialError>(&Ok(None), &mut buf);
+        update_buffer::<serial::ErrorKind>(&Ok(None), &mut buf);
         assert_eq!(buf.as_slice(), [2, 3, 4, 5, 6, 7]);
     }
 
@@ -394,7 +395,7 @@ mod tests {
     fn serial_error() {
         let context = ValidationContext {
             in_bytes: vec![],
-            out_bytes: vec![TestData::Error(nb::Error::Other(SerialError::A))],
+            out_bytes: vec![TestData::Error(nb::Error::Other(serial::ErrorKind::Other))],
         };
         let mut driver = SerialDriver::<_, StubPin>::new(context, None);
         let mut transmission_type = TransmissionType::default();
@@ -415,7 +416,9 @@ mod tests {
         });
         assert_eq!(
             err,
-            Err(DriverError::WriteError(nb::Error::Other(SerialError::A)))
+            Err(DriverError::SystemError(nb::Error::Other(
+                serial::ErrorKind::Other
+            )))
         );
         driver.serial.validate();
     }

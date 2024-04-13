@@ -75,8 +75,8 @@ fn main() -> std::io::Result<()> {
                     .map(|x| x.device_descriptor().unwrap())
                     .map(|x| format!("{:04x}:{:04x}", x.vendor_id(), x.product_id()))
                     .collect::<Vec<String>>(),
-            )
-            .interact()?;
+            );
+        let selection = selection.interact().expect("Invalid selection");
         devices.remove(selection)
     };
 

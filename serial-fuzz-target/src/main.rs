@@ -2,14 +2,18 @@
 extern crate afl;
 extern crate ant;
 use ant::drivers::{Driver, SerialDriver};
-use embedded_hal::serial::{Read, Write};
+use core::convert::Infallible;
+use embedded_hal_nb::serial::{ErrorType, Read, Write};
 
 struct SerialMock {
     data: Vec<u8>,
 }
 
+impl ErrorType for SerialMock {
+    type Error = Infallible;
+}
+
 impl Write<u8> for SerialMock {
-    type Error = u8;
     fn write(&mut self, _word: u8) -> nb::Result<(), Self::Error> {
         Ok(())
     }
@@ -19,7 +23,6 @@ impl Write<u8> for SerialMock {
 }
 
 impl Read<u8> for SerialMock {
-    type Error = u8;
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         if self.data.is_empty() {
             Err(nb::Error::WouldBlock)

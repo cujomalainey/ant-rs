@@ -18,7 +18,7 @@ use rusb::{Device, DeviceHandle, Direction, Interface, TransferType, UsbContext}
 use std::cmp::min;
 use std::time::Duration;
 
-pub type UsbDriverError = DriverError<rusb::Error, rusb::Error>;
+pub type UsbDriverError = DriverError<rusb::Error>;
 
 pub struct UsbDriver<T: UsbContext> {
     handle: DeviceHandle<T>,
@@ -31,10 +31,10 @@ pub struct UsbDriver<T: UsbContext> {
     out_max_packet_size: usize,
 }
 
-impl<T: UsbContext> Driver<rusb::Error, rusb::Error> for UsbDriver<T> {
+impl<T: UsbContext> Driver<rusb::Error> for UsbDriver<T> {
     fn get_message(&mut self) -> Result<Option<AntMessage>, UsbDriverError> {
         if let Err(x) = self.read() {
-            return Err(DriverError::ReadError(x));
+            return Err(DriverError::SystemError(x));
         }
         let buf = &mut self.in_buf;
 
@@ -54,7 +54,7 @@ impl<T: UsbContext> Driver<rusb::Error, rusb::Error> for UsbDriver<T> {
             match self.flush() {
                 // TODO this is blocking, move to a non-blocking model
                 Err(nb::Error::WouldBlock) => continue,
-                Err(x) => return Err(DriverError::WriteError(x)),
+                Err(x) => return Err(DriverError::SystemError(x)),
                 Ok(()) => return Ok(()),
             }
         }

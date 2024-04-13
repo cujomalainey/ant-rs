@@ -13,22 +13,23 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-packed_struct = {version = "0.10.1", default-features = false}
-konst = "0.3.5"
-const-utils = "0.1.1"
-arrayvec = {version = "0.7.2", default-features = false}
-ant-derive = { path = "../ant-derive", version = "0.1.0" }
-embedded-hal = "0.2.7"
-nb = "1.1.0"
-rusb = {version = "0.9.1", optional = true}
-derive-new = {version = "0.5.9", default-features = false}
+packed_struct = {version = "0.10", default-features = false}
+konst = "0.3"
+const-utils = "0.1"
+arrayvec = {version = "0.7", default-features = false}
+ant-derive = { path = "../ant-derive", version = "0.1" }
+embedded-hal = "1.0"
+embedded-hal-nb = "1.0"
+nb = "1.1"
+rusb = {version = "0.9", optional = true}
+derive-new = {version = "0.6", default-features = false}
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
-linux-embedded-hal = "0.3.2"
+linux-embedded-hal = "0.4"
 
 [dev-dependencies]
-dialoguer = "0.10.4"
-inner = "0.1.1"
+dialoguer = "0.11"
+inner = "0.1"
 
 [features]
 default = ["std", "alloc", "usb", "usb_adapter"]

@@ -9,5 +9,6 @@ publish = false
 [dependencies]
 afl = "*"
 embedded-hal = "*"
+embedded-hal-nb = "*"
 nb = "*"
 ant = {version = "*", path = "../ant"}

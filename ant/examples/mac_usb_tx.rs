@@ -42,7 +42,8 @@ fn main() -> std::io::Result<()> {
                     .map(|x| format!("{:04x}:{:04x}", x.vendor_id(), x.product_id()))
                     .collect::<Vec<String>>(),
             )
-            .interact()?;
+            .interact()
+            .expect("Dialogue error");
         devices.remove(selection)
     };
 
