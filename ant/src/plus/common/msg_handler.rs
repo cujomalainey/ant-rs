@@ -337,7 +337,7 @@ impl MessageHandler {
     /// Returns the current device_number in use
     ///
     /// Slave channels: If a wildcard was set and device has not connected yet a wildcard will be returned.
-    /// Recommended to be called after [get_channel_state] returns tracking at least once or you
+    /// Recommended to be called after [MessageHandler::is_tracking] returns tracking at least once or you
     /// have observed a datapage recieved
     ///
     /// Master channels: returns the ID being broadcasted

@@ -79,7 +79,7 @@ const WEAVE_PATTERN: [TxDatapage; 8] = [
 /// A heart rate sensor channel configuration
 ///
 /// When using this profile, mode changes initiaded by display must be triggered by your code. E.g.
-/// if display sends [ModeSettings] your code must call [set_swim_mode]. This is so your code
+/// if display sends [ModeSettings] your code must call [Monitor::set_swim_mode]. This is so your code
 /// can update the config once it is ready to handle the new state.
 pub struct Monitor {
     msg_handler: MessageHandler,
@@ -178,7 +178,7 @@ impl Monitor {
     ///
     /// Should be set in acknowledgement to an [HRFeatureCommand] message.
     ///
-    /// This command will be ignored if [gym_mode_supported] is false.
+    /// This command will be ignored if [Config::gym_mode_supported] is false.
     pub fn set_gym_mode(&mut self, enabled: bool) {
         self.in_gym_mode = self.config.gym_mode_supported && enabled;
     }
@@ -188,7 +188,7 @@ impl Monitor {
     ///
     /// Should be set in acknowledgement to a [ModeSettings] message.
     ///
-    /// This command will be ignored if [swim_mode_supported] is false.
+    /// This command will be ignored if [Config::swim_mode_supported] is false.
     pub fn set_swim_mode(&mut self, enabled: bool) {
         self.in_swim_mode = self.config.swim_mode_supported && enabled;
     }
