@@ -34,7 +34,7 @@ pub enum MainDataPage {
     PreviousHeartBeat,
 }
 
-pub struct Config {
+pub struct MonitorConfig {
     /// Device number for the monitor, cannot be 0
     pub device_number: u16,
     /// Transmission type extension for the monitor, cannot be 0
@@ -89,7 +89,7 @@ pub struct Monitor {
     tx_datapage_callback: TxDatapageCallback,
     in_gym_mode: bool,
     in_swim_mode: bool,
-    config: Config,
+    config: MonitorConfig,
     page_state: PageState,
 }
 
@@ -108,7 +108,7 @@ pub enum TxDatapage {
 
 impl Monitor {
     pub fn new(
-        config: Config,
+        config: MonitorConfig,
         ant_plus_key_index: u8,
         channel: u8,
         rx_datapage_callback: RxDataPageCallback,
@@ -119,24 +119,22 @@ impl Monitor {
             rx_datapage_callback,
             tx_message_callback: None,
             tx_datapage_callback,
-            msg_handler: MessageHandler::new(
+            msg_handler: MessageHandler::new(&ChannelConfig {
                 channel,
-                &ChannelConfig {
-                    device_number: config.device_number,
-                    device_type: DEVICE_TYPE,
-                    channel_type: ChannelType::BidirectionalMaster,
-                    network_key_index: ant_plus_key_index,
-                    transmission_type: TransmissionType::new(
-                        TransmissionChannelType::IndependentChannel,
-                        TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
-                        config.transmission_type_extension,
-                    ),
-                    radio_frequency: NETWORK_RF_FREQUENCY,
-                    timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
-                    channel_period: Period::FourHz.into(), // Monitor always uses 4Hz, display may use
-                                                           // less
-                },
-            ),
+                device_number: config.device_number,
+                device_type: DEVICE_TYPE,
+                channel_type: ChannelType::BidirectionalMaster,
+                network_key_index: ant_plus_key_index,
+                transmission_type: TransmissionType::new(
+                    TransmissionChannelType::IndependentChannel,
+                    TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+                    config.transmission_type_extension,
+                ),
+                radio_frequency: NETWORK_RF_FREQUENCY,
+                timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
+                channel_period: Period::FourHz.into(), // Monitor always uses 4Hz, display may use
+                                                       // less
+            }),
             config,
             in_gym_mode: false,
             in_swim_mode: false,

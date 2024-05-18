@@ -157,8 +157,8 @@ impl<E, D: Driver<E>> Router<E, D> {
         if channel as usize >= MAX_CHANNELS {
             return Err(RouterError::ChannelOutOfBounds());
         }
-        _ = match &self.channels[channel as usize] {
-            Some(handler) => handler.send(msg),
+        match &self.channels[channel as usize] {
+            Some(handler) => handler.try_send(msg).expect("TODO"),
             None => return Err(RouterError::ChannelNotAssociated()),
         };
         Ok(())
@@ -168,7 +168,7 @@ impl<E, D: Driver<E>> Router<E, D> {
         self.channels
             .iter()
             .flatten()
-            .for_each(|x| _ = x.send(msg.clone()));
+            .for_each(|x| x.try_send(msg.clone()).expect("TODO"));
     }
 
     fn parse_capabilities(&self, msg: &Capabilities) {

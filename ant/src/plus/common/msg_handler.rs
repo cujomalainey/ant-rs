@@ -261,6 +261,7 @@ enum ChannelStateCommand {
 // TODO doc
 #[derive(Copy, Clone, Debug)]
 pub struct ChannelConfig {
+    pub channel: u8,
     pub device_number: u16,
     pub device_type: u8,
     pub channel_type: ChannelType,
@@ -308,9 +309,9 @@ pub struct MessageHandler {
 }
 
 impl MessageHandler {
-    pub fn new(channel: u8, channel_config: &ChannelConfig) -> Self {
+    pub fn new(channel_config: &ChannelConfig) -> Self {
         Self {
-            channel,
+            channel: channel_config.channel,
             configure_state: &UNKNOWN_CLOSE_STATE,
             set_channel_state: None,
             tx_ready: true,

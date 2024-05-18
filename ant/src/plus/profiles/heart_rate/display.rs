@@ -38,37 +38,47 @@ pub struct Display {
     rx: Receiver<AntMessage>,
 }
 
+pub struct DisplayConfig {
+    pub channel: u8,
+    pub device_number: u16,
+    pub device_number_extension: Integer<u8, Bits<4>>,
+    pub ant_plus_key_index: u8,
+    pub period: Period,
+}
+
 impl Display {
     pub fn new(
+        conf: DisplayConfig,
         // TODO make this a type
-        device: Option<(u16, Integer<u8, Bits<4>>)>,
-        ant_plus_key_index: u8,
-        channel: u8,
-        period: Period,
         tx: Sender<TxMessage>,
         rx: Receiver<AntMessage>,
     ) -> Self {
-        let (device_number, transmission_type_extension) = device.unwrap_or((0, 0.into()));
-        let channel_config = ChannelConfig {
-            device_number,
-            device_type: DEVICE_TYPE,
-            channel_type: ChannelType::BidirectionalSlave,
-            network_key_index: ant_plus_key_index,
-            transmission_type: TransmissionType::new(
+        let transmission_type = if conf.device_number_extension == 0.into() {
+            TransmissionType::new_wildcard()
+        } else {
+            TransmissionType::new(
                 TransmissionChannelType::IndependentChannel,
                 TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
-                transmission_type_extension,
-            ),
+                conf.device_number_extension,
+            )
+        };
+        let channel_config = ChannelConfig {
+            channel: conf.channel,
+            device_number: conf.device_number,
+            device_type: DEVICE_TYPE,
+            channel_type: ChannelType::BidirectionalSlave,
+            network_key_index: conf.ant_plus_key_index,
+            transmission_type,
             radio_frequency: NETWORK_RF_FREQUENCY,
             timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
-            channel_period: period.into(),
+            channel_period: conf.period.into(),
         };
         Self {
             rx_message_callback: None,
             rx_datapage_callback: None,
             tx_message_callback: None,
             tx_datapage_callback: None,
-            msg_handler: MessageHandler::new(channel, &channel_config),
+            msg_handler: MessageHandler::new(&channel_config),
             tx,
             rx,
         }
@@ -186,13 +196,13 @@ impl Display {
 
         // TODO handle errors
         if let Some(msg) = self.msg_handler.send_message() {
-            _ = self.tx.send(msg);
+            self.tx.try_send(msg).expect("TODO");
             return;
         }
         if let Some(callback) = self.tx_message_callback {
             if let Some(mut msg) = callback() {
                 msg.set_channel(self.msg_handler.get_channel());
-                _ = self.tx.send(msg.into());
+                self.tx.try_send(msg.into()).expect("TODO");
                 return;
             }
         }
@@ -201,8 +211,7 @@ impl Display {
                 if let Some(mut msg) = callback() {
                     msg.set_channel(self.msg_handler.get_channel());
                     self.msg_handler.tx_sent();
-                    _ = self.tx.send(msg.into());
-                    return;
+                    self.tx.try_send(msg.into()).expect("TODO");
                 }
             }
         }
