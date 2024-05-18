@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
+use crate::channel::duration_to_search_timeout;
 use crate::messages::config::{
     ChannelType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
 };
@@ -110,6 +110,7 @@ impl Monitor {
     pub fn new(
         config: Config,
         ant_plus_key_index: u8,
+        channel: u8,
         rx_datapage_callback: RxDataPageCallback,
         tx_datapage_callback: TxDatapageCallback,
     ) -> Self {
@@ -118,21 +119,24 @@ impl Monitor {
             rx_datapage_callback,
             tx_message_callback: None,
             tx_datapage_callback,
-            msg_handler: MessageHandler::new(&ChannelConfig {
-                device_number: config.device_number,
-                device_type: DEVICE_TYPE,
-                channel_type: ChannelType::BidirectionalMaster,
-                network_key_index: ant_plus_key_index,
-                transmission_type: TransmissionType::new(
-                    TransmissionChannelType::IndependentChannel,
-                    TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
-                    config.transmission_type_extension,
-                ),
-                radio_frequency: NETWORK_RF_FREQUENCY,
-                timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
-                channel_period: Period::FourHz.into(), // Monitor always uses 4Hz, display may use
-                                                       // less
-            }),
+            msg_handler: MessageHandler::new(
+                channel,
+                &ChannelConfig {
+                    device_number: config.device_number,
+                    device_type: DEVICE_TYPE,
+                    channel_type: ChannelType::BidirectionalMaster,
+                    network_key_index: ant_plus_key_index,
+                    transmission_type: TransmissionType::new(
+                        TransmissionChannelType::IndependentChannel,
+                        TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+                        config.transmission_type_extension,
+                    ),
+                    radio_frequency: NETWORK_RF_FREQUENCY,
+                    timeout_duration: duration_to_search_timeout(Duration::from_secs(30)),
+                    channel_period: Period::FourHz.into(), // Monitor always uses 4Hz, display may use
+                                                           // less
+                },
+            ),
             config,
             in_gym_mode: false,
             in_swim_mode: false,
@@ -318,10 +322,8 @@ impl Monitor {
             self.get_next_datapage()
         }
     }
-}
 
-impl Channel for Monitor {
-    fn receive_message(&mut self, msg: &AntMessage) {
+    pub fn process(&mut self, msg: &AntMessage) {
         if let Some(f) = self.rx_message_callback {
             f(msg);
         }
@@ -344,28 +346,19 @@ impl Channel for Monitor {
         if msg.is_some() {
             return msg;
         }
-        let channel = if let ChannelAssignment::Assigned(channel) = self.msg_handler.get_channel() {
-            channel
-        } else {
-            return None;
-        };
         if let Some(callback) = self.tx_message_callback {
             if let Some(mut msg) = callback() {
-                msg.set_channel(channel);
+                msg.set_channel(self.msg_handler.get_channel());
                 return Some(msg.into());
             }
         }
         if self.msg_handler.is_tx_ready() {
             let callback = self.tx_datapage_callback;
             let dp = self.get_next_datapage();
-            let msg = BroadcastData::new(channel, callback(&dp)); // TODO handle ack param
+            let msg = BroadcastData::new(self.msg_handler.get_channel(), callback(&dp)); // TODO handle ack param
             self.msg_handler.tx_sent();
             return Some(msg.into());
         }
         None
-    }
-
-    fn set_channel(&mut self, channel: ChannelAssignment) {
-        self.msg_handler.set_channel(channel);
     }
 }

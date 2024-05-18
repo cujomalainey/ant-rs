@@ -13,8 +13,7 @@ use ant::router::Router;
 use dialoguer::Select;
 use rusb::{Device, DeviceList};
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use thingbuf::mpsc::channel;
 
 fn main() -> std::io::Result<()> {
     let mut devices: Vec<Device<_>> = DeviceList::new()
@@ -46,17 +45,19 @@ fn main() -> std::io::Result<()> {
 
     let driver = UsbDriver::new(device).unwrap();
 
-    let mut router = Router::new(driver).unwrap();
+    let (channel_tx, router_rx) = channel(8);
+    let (router_tx, channel_rx) = channel(8);
+
+    let mut router = Router::new(driver, router_rx).unwrap();
     let snk = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // Get this from thisisant.com
     router.send(&snk).expect("failed to set network key");
-    let hr = Rc::new(RefCell::new(Display::new(None, 0, Period::FourHz)));
-    // hr.borrow_mut()
-    //     .set_rx_datapage_callback(Some(|x| println!("{:#?}", x)));
-    hr.borrow_mut()
-        .set_rx_message_callback(Some(|x| println!("{:#?}", x)));
-    router.add_channel(hr.clone()).expect("Add channel failed");
-    hr.borrow_mut().open();
+    let chan = router.add_channel(router_tx).expect("Add channel failed");
+    let mut hr = Display::new(None, 0, chan, Period::FourHz, channel_tx, channel_rx);
+    hr.set_rx_datapage_callback(Some(|x| println!("{:#?}", x)));
+    hr.set_rx_message_callback(Some(|x| println!("{:#?}", x)));
+    hr.open();
     loop {
         router.process().unwrap();
+        hr.process();
     }
 }

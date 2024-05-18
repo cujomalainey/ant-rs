@@ -6,7 +6,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::channel::ChannelAssignment;
 use crate::messages::channel::{ChannelEvent, ChannelResponse, MessageCode};
 use crate::messages::config::{
     AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
@@ -288,7 +287,7 @@ struct StateConfig {
 }
 
 pub struct MessageHandler {
-    channel: ChannelAssignment,
+    channel: u8,
     /// Are we setting the pairing bit?
     pairing_request: DevicePairingState,
     /// Configuration state machine pointer
@@ -309,9 +308,9 @@ pub struct MessageHandler {
 }
 
 impl MessageHandler {
-    pub fn new(channel_config: &ChannelConfig) -> Self {
+    pub fn new(channel: u8, channel_config: &ChannelConfig) -> Self {
         Self {
-            channel: ChannelAssignment::UnAssigned(),
+            channel,
             configure_state: &UNKNOWN_CLOSE_STATE,
             set_channel_state: None,
             tx_ready: true,
@@ -330,7 +329,7 @@ impl MessageHandler {
         // master)
     }
 
-    pub fn get_channel(&self) -> ChannelAssignment {
+    pub fn get_channel(&self) -> u8 {
         self.channel
     }
 
@@ -360,15 +359,9 @@ impl MessageHandler {
     }
 
     pub fn send_message(&mut self) -> Option<TxMessage> {
-        // Skip if we are not assigned
-        let channel = match self.channel {
-            ChannelAssignment::UnAssigned() => return None,
-            ChannelAssignment::Assigned(channel) => channel,
-        };
-
         // Walk through configure state machine
         if !self.configure_pending_response {
-            let msg = self.configure_state.transmit_config(channel, self);
+            let msg = self.configure_state.transmit_config(self.channel, self);
             if msg.is_some() {
                 self.configure_pending_response = true;
                 return msg;
@@ -395,7 +388,7 @@ impl MessageHandler {
             }
             return Some(
                 ChannelId::new(
-                    channel,
+                    self.channel,
                     self.state_config.device_number,
                     DeviceType::new(
                         self.state_config.channel_config.device_type.into(),
@@ -410,8 +403,8 @@ impl MessageHandler {
         // Handle channel open close command
         if let Some(command) = &self.set_channel_state {
             let msg = match command {
-                ChannelStateCommand::Open => OpenChannel::new(channel).into(),
-                ChannelStateCommand::Close => CloseChannel::new(channel).into(),
+                ChannelStateCommand::Open => OpenChannel::new(self.channel).into(),
+                ChannelStateCommand::Close => CloseChannel::new(self.channel).into(),
             };
             self.set_channel_state = None;
             return Some(msg);
@@ -420,7 +413,7 @@ impl MessageHandler {
         if self.tx_channel_id_request {
             self.tx_channel_id_request = false;
             return Some(
-                RequestMessage::new(channel, RequestableMessageId::ChannelId, None).into(),
+                RequestMessage::new(self.channel, RequestableMessageId::ChannelId, None).into(),
             );
         }
 
@@ -524,12 +517,6 @@ impl MessageHandler {
         self.set_channel_state = Some(ChannelStateCommand::Close);
     }
 
-    /// Moves config to a new channel while maintaining bonding information
-    pub fn set_channel(&mut self, channel: ChannelAssignment) {
-        self.channel = channel;
-        self.reset_state(false);
-    }
-
     /// Resets assumed channel state. Maintains bonding information if `reset_id_data` is `false`.
     pub fn reset_state(&mut self, reset_id_data: bool) {
         self.configure_state = &UNKNOWN_CLOSE_STATE;
@@ -602,14 +589,13 @@ mod tests {
 
     #[test]
     fn inert_start() {
-        let mut msg_handler = MessageHandler::new(&get_config());
+        let mut msg_handler = MessageHandler::new(4, &get_config());
         assert!(msg_handler.send_message().is_none());
     }
 
     #[test]
     fn assign_config() {
-        let mut msg_handler = MessageHandler::new(&get_config());
-        msg_handler.set_channel(ChannelAssignment::Assigned(4));
+        let mut msg_handler = MessageHandler::new(4, &get_config());
         let data = get_config_message(&mut msg_handler, TxMessageId::AssignChannel);
         if let TxMessage::AssignChannel(data) = data {
             assert_eq!(data.data.channel_number, 4);
@@ -623,8 +609,7 @@ mod tests {
 
     #[test]
     fn close_state() {
-        let mut msg_handler = MessageHandler::new(&get_config());
-        msg_handler.set_channel(ChannelAssignment::Assigned(4));
+        let mut msg_handler = MessageHandler::new(4, &get_config());
         let data = get_config_message(&mut msg_handler, TxMessageId::CloseChannel);
         if let TxMessage::CloseChannel(data) = data {
             assert_eq!(data.channel_number, 4);

@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::channel::{duration_to_search_timeout, Channel, ChannelAssignment};
+use crate::channel::duration_to_search_timeout;
 use crate::messages::config::{
     ChannelType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
 };
@@ -26,19 +26,27 @@ use packed_struct::{PackedStruct, PrimitiveEnum};
 
 use std::time::Duration;
 
+use thingbuf::mpsc::{Receiver, Sender};
+
 pub struct Display {
     msg_handler: MessageHandler,
     rx_message_callback: Option<fn(&AntMessage)>,
     rx_datapage_callback: Option<fn(Result<MonitorTxDataPage, Error>)>,
     tx_message_callback: Option<fn() -> Option<TxMessageChannelConfig>>,
     tx_datapage_callback: Option<fn() -> Option<TxMessageData>>,
+    tx: Sender<TxMessage>,
+    rx: Receiver<AntMessage>,
 }
 
 impl Display {
     pub fn new(
+        // TODO make this a type
         device: Option<(u16, Integer<u8, Bits<4>>)>,
         ant_plus_key_index: u8,
+        channel: u8,
         period: Period,
+        tx: Sender<TxMessage>,
+        rx: Receiver<AntMessage>,
     ) -> Self {
         let (device_number, transmission_type_extension) = device.unwrap_or((0, 0.into()));
         let channel_config = ChannelConfig {
@@ -60,7 +68,9 @@ impl Display {
             rx_datapage_callback: None,
             tx_message_callback: None,
             tx_datapage_callback: None,
-            msg_handler: MessageHandler::new(&channel_config),
+            msg_handler: MessageHandler::new(channel, &channel_config),
+            tx,
+            rx,
         }
     }
 
@@ -153,57 +163,48 @@ impl Display {
         }
         Err(Error::UnsupportedDataPage(dp_num))
     }
-}
 
-impl Channel for Display {
-    fn receive_message(&mut self, msg: &AntMessage) {
-        if let Some(f) = self.rx_message_callback {
-            f(msg);
-        }
-        match msg.message {
-            RxMessage::BroadcastData(msg) => self.handle_dp(&msg.payload.data),
-            RxMessage::AcknowledgedData(msg) => self.handle_dp(&msg.payload.data),
-            _ => (),
-        }
-        match self.msg_handler.receive_message(msg) {
-            Ok(_) => (),
-            Err(e) => {
-                if let Some(f) = self.rx_datapage_callback {
-                    f(Err(e.into()));
+    pub fn process(&mut self) {
+        while let Ok(msg) = self.rx.try_recv() {
+            if let Some(f) = self.rx_message_callback {
+                f(&msg);
+            }
+            match msg.message {
+                RxMessage::BroadcastData(msg) => self.handle_dp(&msg.payload.data),
+                RxMessage::AcknowledgedData(msg) => self.handle_dp(&msg.payload.data),
+                _ => (),
+            }
+            match self.msg_handler.receive_message(&msg) {
+                Ok(_) => (),
+                Err(e) => {
+                    if let Some(f) = self.rx_datapage_callback {
+                        f(Err(e.into()));
+                    }
                 }
             }
         }
-    }
 
-    fn send_message(&mut self) -> Option<TxMessage> {
-        let msg = self.msg_handler.send_message();
-        if msg.is_some() {
-            return msg;
+        // TODO handle errors
+        if let Some(msg) = self.msg_handler.send_message() {
+            _ = self.tx.send(msg);
+            return;
         }
-        let channel = if let ChannelAssignment::Assigned(channel) = self.msg_handler.get_channel() {
-            channel
-        } else {
-            return None;
-        };
         if let Some(callback) = self.tx_message_callback {
             if let Some(mut msg) = callback() {
-                msg.set_channel(channel);
-                return Some(msg.into());
+                msg.set_channel(self.msg_handler.get_channel());
+                _ = self.tx.send(msg.into());
+                return;
             }
         }
         if self.msg_handler.is_tx_ready() {
             if let Some(callback) = self.tx_datapage_callback {
                 if let Some(mut msg) = callback() {
-                    msg.set_channel(channel);
+                    msg.set_channel(self.msg_handler.get_channel());
                     self.msg_handler.tx_sent();
-                    return Some(msg.into());
+                    _ = self.tx.send(msg.into());
+                    return;
                 }
             }
         }
-        None
-    }
-
-    fn set_channel(&mut self, channel: ChannelAssignment) {
-        self.msg_handler.set_channel(channel);
     }
 }

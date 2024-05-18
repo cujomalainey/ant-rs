@@ -141,10 +141,8 @@ impl<E, D: Driver<E>> Router<E, D> {
         if chan.is_none() {
             return Err(RouterError::ChannelNotAssociated());
         }
-        self.driver
-            .send_message(&CloseChannel::new(channel))?;
-        self.driver
-            .send_message(&UnAssignChannel::new(channel))?;
+        self.driver.send_message(&CloseChannel::new(channel))?;
+        self.driver.send_message(&UnAssignChannel::new(channel))?;
         Ok(())
     }
 
