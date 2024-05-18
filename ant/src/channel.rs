@@ -33,3 +33,10 @@ pub trait Channel {
     /// Assign channel from associated router or manually if not using a router
     fn set_channel(&mut self, channel: ChannelAssignment);
 }
+
+// TODO add a send and get response
+//
+// Logically since this is single threaded, if we send and recieve in the same call, all
+// messages that may come inbetween send and recieve have no consequence on the code flow. The
+// only challenge will be handling ownership since we will likely be holding the sender in a
+// mutable state and if they recieve another message it will be a problem

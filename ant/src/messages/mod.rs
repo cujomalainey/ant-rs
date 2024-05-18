@@ -78,6 +78,7 @@ pub enum RxMessage {
     // #define EXTENDED_BURST_DATA                 0x5F
 }
 
+#[derive(Clone, Debug)]
 pub enum TxMessage {
     UnAssignChannel(UnAssignChannel),
     AssignChannel(AssignChannel),
@@ -131,6 +132,13 @@ pub enum TxMessage {
     AdvancedBurstData(AdvancedBurstData),
     CwInit(CwInit),
     CwTest(CwTest),
+}
+
+// Hack to allow channels to recycle memory, not for actual use
+impl Default for TxMessage {
+    fn default() -> TxMessage {
+        TxMessage::UnAssignChannel(UnAssignChannel { channel_number: 0 })
+    }
 }
 
 impl TransmitableMessage for TxMessage {
@@ -376,6 +384,27 @@ pub struct AntMessage {
     pub message: RxMessage,
     /// XOR of all prior bytes should match this
     pub checksum: u8,
+}
+
+// Hack to allow memory channels to recycle, not intended for actual use
+impl Default for AntMessage {
+    fn default() -> AntMessage {
+        AntMessage {
+            header: RxMessageHeader {
+                sync: RxSyncByte::Read,
+                msg_length: 0,
+                msg_id: RxMessageId::StartUpMessage,
+            },
+            message: RxMessage::StartUpMessage(StartUpMessage {
+                hardware_reset_line: false,
+                watch_dog_reset: false,
+                command_reset: false,
+                synchronous_reset: false,
+                suspend_reset: false,
+            }),
+            checksum: 0,
+        }
+    }
 }
 
 /// Trait for any TX message type

@@ -11,7 +11,7 @@ use ant_derive::AntTx;
 use derive_new::new;
 use packed_struct::prelude::*;
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
 pub struct ResetSystem {
     #[new(default)]
@@ -19,7 +19,7 @@ pub struct ResetSystem {
     filler: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
 pub struct OpenChannel {
     #[packed_field(bytes = "0")]

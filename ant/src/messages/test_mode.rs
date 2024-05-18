@@ -3,7 +3,7 @@ use ant_derive::AntTx;
 use derive_new::new;
 use packed_struct::prelude::*;
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
 pub struct CwInit {
     #[new(default)]
@@ -11,7 +11,7 @@ pub struct CwInit {
     filler: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct CwTest {
     #[new(default)]

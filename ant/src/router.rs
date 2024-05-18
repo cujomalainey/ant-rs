@@ -6,20 +6,16 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::channel::{Channel, ChannelAssignment};
 use crate::drivers::{Driver, DriverError};
 use crate::messages::config::UnAssignChannel;
 use crate::messages::control::{CloseChannel, RequestMessage, RequestableMessageId, ResetSystem};
 use crate::messages::requested_response::Capabilities;
-use crate::messages::{AntMessage, RxMessage, TransmitableMessage};
+use crate::messages::{AntMessage, RxMessage, TransmitableMessage, TxMessage};
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::marker::PhantomData;
 
-#[cfg(not(feature = "std"))]
-use alloc::rc::Rc;
-#[cfg(feature = "std")]
-use std::rc::Rc;
+use thingbuf::mpsc::{Receiver, Sender};
 
 #[derive(Debug)]
 pub enum RouterError {
@@ -35,14 +31,13 @@ pub enum RouterError {
 /// Highest known supported channel count on a ANT device
 pub const MAX_CHANNELS: usize = 15;
 
-type SharedChannel = Rc<RefCell<dyn Channel>>;
-
 pub struct Router<E, D: Driver<E>> {
-    channels: [Option<SharedChannel>; MAX_CHANNELS],
+    channels: [Option<Sender<AntMessage>>; MAX_CHANNELS],
     max_channels: Cell<usize>, // what the hardware reports as some have less than max
     driver: D,
     reset_restore: Cell<bool>,
     rx_message_callback: Option<fn(&AntMessage)>,
+    receiver: Receiver<TxMessage>,
     _marker: PhantomData<E>,
 }
 
@@ -56,7 +51,8 @@ impl<E> From<DriverError<E>> for RouterError {
 const ROUTER_CAPABILITIES_RETRIES: u8 = 25;
 
 impl<E, D: Driver<E>> Router<E, D> {
-    pub fn new(mut driver: D) -> Result<Self, RouterError> {
+    // TODO change to generic receiver
+    pub fn new(mut driver: D, receiver: Receiver<TxMessage>) -> Result<Self, RouterError> {
         // Reset system so we are coherent
         driver.send_message(&ResetSystem::new())?;
         // Purge driver state
@@ -67,15 +63,14 @@ impl<E, D: Driver<E>> Router<E, D> {
             RequestableMessageId::Capabilities,
             None,
         ))?;
+        const ARRAY_INIT: Option<Sender<AntMessage>> = None;
         let mut router = Self {
-            channels: [
-                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-                None,
-            ],
+            channels: [ARRAY_INIT; MAX_CHANNELS],
             max_channels: Cell::new(0),
             reset_restore: Cell::new(false),
             driver,
             rx_message_callback: None,
+            receiver,
             _marker: PhantomData,
         };
         // If we don't get a response within 25ms give up
@@ -91,23 +86,20 @@ impl<E, D: Driver<E>> Router<E, D> {
     }
 
     /// Add a channel at next available index
-    pub fn add_channel(&mut self, channel: SharedChannel) -> Result<(), RouterError> {
+    pub fn add_channel(&mut self, channel: Sender<AntMessage>) -> Result<u8, RouterError> {
         let index = self.channels.iter().position(|x| x.is_none());
         let index = match index {
             Some(x) => x,
             None => return Err(RouterError::OutOfChannels()),
         };
-        channel
-            .borrow_mut()
-            .set_channel(ChannelAssignment::Assigned(index as u8));
         self.channels[index] = Some(channel);
-        Ok(())
+        Ok(index as u8)
     }
 
     /// Add channel at a specific index
     pub fn add_channel_at_index(
         &mut self,
-        channel: SharedChannel,
+        channel: Sender<AntMessage>,
         index: usize,
     ) -> Result<(), RouterError> {
         if index >= self.max_channels.get() {
@@ -116,9 +108,6 @@ impl<E, D: Driver<E>> Router<E, D> {
         if self.channels[index].is_some() {
             return Err(RouterError::ChannelAlreadyAssigned());
         }
-        channel
-            .borrow_mut()
-            .set_channel(ChannelAssignment::Assigned(index as u8));
         self.channels[index] = Some(channel);
         Ok(())
     }
@@ -144,33 +133,19 @@ impl<E, D: Driver<E>> Router<E, D> {
         Ok(())
     }
 
-    // TODO add a send and get response
-    //
-    // Logically since this is single threaded, if we send and recieve in the same call, all
-    // messages that may come inbetween send and recieve have no consequence on the code flow. The
-    // only challenge will be handling ownership since we will likely be holding the sender in a
-    // mutable state and if they recieve another message it will be a problem
-
     /// Given a reference channel remove it from the router
     // TODO test
-    pub fn remove_channel(&mut self, channel: &SharedChannel) -> Result<(), RouterError> {
-        let index = self
-            .channels
-            .iter()
-            .flatten()
-            .position(|x| std::ptr::eq(x, channel));
-        if let Some(x) = index {
-            let chan = self.channels[x].take();
-            if let Some(chan) = chan {
-                chan.borrow_mut()
-                    .set_channel(ChannelAssignment::UnAssigned());
-            }
-            // TODO maybe reset channel?
-            self.driver.send_message(&CloseChannel::new(x as u8))?;
-            self.driver.send_message(&UnAssignChannel::new(x as u8))?;
-            return Ok(());
+    pub fn remove_channel(&mut self, channel: u8) -> Result<(), RouterError> {
+        // TODO make indux lookup safe
+        let chan = self.channels[channel as usize].take();
+        if chan.is_none() {
+            return Err(RouterError::ChannelNotAssociated());
         }
-        Err(RouterError::ChannelNotAssociated())
+        self.driver
+            .send_message(&CloseChannel::new(channel))?;
+        self.driver
+            .send_message(&UnAssignChannel::new(channel))?;
+        Ok(())
     }
 
     /// Register a callback to obersve all messages, this is meant for debugging or
@@ -180,22 +155,22 @@ impl<E, D: Driver<E>> Router<E, D> {
         self.rx_message_callback = f;
     }
 
-    fn route_message(&self, channel: u8, msg: &AntMessage) -> Result<(), RouterError> {
+    fn route_message(&self, channel: u8, msg: AntMessage) -> Result<(), RouterError> {
         if channel as usize >= MAX_CHANNELS {
             return Err(RouterError::ChannelOutOfBounds());
         }
-        match &self.channels[channel as usize] {
-            Some(handler) => handler.borrow_mut().receive_message(msg),
+        _ = match &self.channels[channel as usize] {
+            Some(handler) => handler.send(msg),
             None => return Err(RouterError::ChannelNotAssociated()),
         };
         Ok(())
     }
 
-    fn broadcast_message(&self, msg: &AntMessage) {
+    fn broadcast_message(&self, msg: AntMessage) {
         self.channels
             .iter()
             .flatten()
-            .for_each(|x| x.borrow_mut().receive_message(msg));
+            .for_each(|x| _ = x.send(msg.clone()));
     }
 
     fn parse_capabilities(&self, msg: &Capabilities) {
@@ -203,9 +178,9 @@ impl<E, D: Driver<E>> Router<E, D> {
             .set(msg.base_capabilities.max_ant_channels as usize);
     }
 
-    fn handle_message(&self, msg: &AntMessage) -> Result<(), RouterError> {
+    fn handle_message(&self, msg: AntMessage) -> Result<(), RouterError> {
         if let Some(f) = self.rx_message_callback {
-            f(msg);
+            f(&msg);
         }
         match &msg.message {
             // These messages all have channel information, forward it accordingly
@@ -230,7 +205,7 @@ impl<E, D: Driver<E>> Router<E, D> {
                 Ok(())
             }
             RxMessage::Capabilities(data) => {
-                self.broadcast_message(msg);
+                self.broadcast_message(msg.clone());
                 self.parse_capabilities(data);
                 Ok(())
             }
@@ -262,24 +237,16 @@ impl<E, D: Driver<E>> Router<E, D> {
     /// Parse all incoming messages and run callbacks
     pub fn process(&mut self) -> Result<(), RouterError> {
         while let Some(msg) = self.driver.get_message()? {
-            self.handle_message(&msg)?;
+            self.handle_message(msg)?;
         }
-        let driver = &mut self.driver;
-        self.channels
-            .iter()
-            .flatten()
-            .try_for_each(|x| Self::send_channel(driver, x))
+        while let Ok(msg) = self.receiver.try_recv() {
+            self.driver.send_message(&msg)?;
+        }
+        Ok(())
     }
 
     /// Teardown router and return driver
     pub fn release(self) -> D {
         self.driver
-    }
-
-    fn send_channel(driver: &mut D, channel: &SharedChannel) -> Result<(), RouterError> {
-        while let Some(msg) = channel.borrow_mut().send_message() {
-            driver.send_message(&msg)?;
-        }
-        Ok(())
     }
 }

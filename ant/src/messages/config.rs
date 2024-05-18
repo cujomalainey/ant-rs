@@ -708,7 +708,7 @@ impl ConfigureAdvancedBurstData {
 }
 
 /// Represents a Configure Advanced Burst message (0x78)
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ConfigureAdvancedBurst {
     /// Required Fields
     pub data: ConfigureAdvancedBurstData,
@@ -830,7 +830,7 @@ impl ConfigureAdvancedBurst {
 
 /// Represents a Configure Event Filter message (0x79)
 #[allow(clippy::too_many_arguments)]
-#[derive(PackedStruct, AntTx, new, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct ConfigureEventFilter {
     #[new(default)]
@@ -872,7 +872,7 @@ pub struct ConfigureEventFilter {
 }
 
 /// Represents a Configure Selective Data Updates message (0x7A)
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct ConfigureSelectiveDataUpdates {
     /// Channel to be configured
@@ -886,7 +886,7 @@ pub struct ConfigureSelectiveDataUpdates {
 // TODO test
 
 /// Represents a Set Selective Data Update Mask message (0x7B)
-#[derive(PackedStruct, AntTx, new, Clone, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "9")]
 pub struct SetSelectiveDataUpdateMask {
     /// Mask to updated
@@ -914,7 +914,7 @@ pub enum EncryptionMode {
 }
 
 /// Represents a Enable Single Channel Encryption message (0x7D)
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "4")]
 pub struct EnableSingleChannelEncryption {
     /// Channel to be configured
@@ -932,7 +932,7 @@ pub struct EnableSingleChannelEncryption {
     pub decimation_rate: u8,
 }
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "17")]
 pub struct SetEncryptionKey {
     /// Per version 5.1 of the spec this field has a range of 0
@@ -946,7 +946,7 @@ pub struct SetEncryptionKey {
 // The spec defines this as a single variable message but variable types are
 // basically impossible with the packed_stuct lib so it is easier to just
 // implement 3 message types to handle all the cases.
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "5")]
 pub struct SetEncryptionInfoEncryptionId {
     // 0 for encryption id
@@ -957,7 +957,7 @@ pub struct SetEncryptionInfoEncryptionId {
     pub encryption_id: EncryptionId,
 }
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "20")]
 pub struct SetEncryptionInfoUserInformationString {
     // 1 for User Information String
@@ -971,7 +971,7 @@ pub struct SetEncryptionInfoUserInformationString {
     pub user_information_string: UserInformationString,
 }
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "17")]
 pub struct SetEncryptionInfoRandomSeed {
     // 2 for Random Number Seed
@@ -988,7 +988,7 @@ pub struct SetEncryptionInfoRandomSeed {
     pub random_seed: [u8; 16],
 }
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "2")]
 pub struct ChannelSearchSharing {
     #[packed_field(bytes = "0")]
@@ -997,7 +997,7 @@ pub struct ChannelSearchSharing {
     pub search_sharing_cycles: u8,
 }
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "3")]
 pub struct LoadEncryptionKeyFromNvm {
     #[new(default)]
@@ -1011,7 +1011,7 @@ pub struct LoadEncryptionKeyFromNvm {
     volatile_key_index: ReservedZeroes<packed_bits::Bits<8>>,
 }
 
-#[derive(PackedStruct, AntTx, new, Debug, Default, PartialEq)]
+#[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "18")]
 pub struct StoreEncryptionKeyInNvm {
     #[new(default)]
