@@ -123,7 +123,7 @@ fn find_endpoint(
 
 impl<T: UsbContext> UsbDriver<T> {
     pub fn new(device: Device<T>) -> Result<Self, UsbError> {
-        let mut handle = match device.open() {
+        let handle = match device.open() {
             Ok(h) => h,
             Err(e) => return Err(UsbError::FailedToOpenDevice(e)),
         };
@@ -177,7 +177,7 @@ impl<T: UsbContext> UsbDriver<T> {
         })
     }
 
-    pub fn release(mut self) -> Result<Device<T>, rusb::Error> {
+    pub fn release(self) -> Result<Device<T>, rusb::Error> {
         // reatach all drivers and undo usb walk
         // TODO cast into local error type
         self.handle.release_interface(self.iface)?;
