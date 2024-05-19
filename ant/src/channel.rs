@@ -58,7 +58,7 @@ pub trait RxHandler<T> {
     fn try_recv(&self) -> Result<T, RxError>;
 }
 
-#[cfg(not(no_std))]
+#[cfg(not(std))]
 pub mod mpsc {
     use super::*;
     use std::sync::mpsc::{Receiver, Sender};
