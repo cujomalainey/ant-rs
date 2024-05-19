@@ -734,4 +734,19 @@ mod tests {
     fn reset() {
         // TODO
     }
+
+    #[test]
+    fn tx_ready_after_open() {
+        let mut msg_handler = MessageHandler::new(&get_config());
+        assert!(!msg_handler.is_tx_ready());
+        get_config_message(&mut msg_handler, TxMessageId::SearchTimeout);
+        // end of config
+        assert!(!msg_handler.is_tx_ready());
+        msg_handler
+            .receive_message(&get_response_ok(TxMessageId::SearchTimeout))
+            .expect("State machine error");
+        msg_handler.open();
+        get_config_message(&mut msg_handler, TxMessageId::OpenChannel);
+        assert!(msg_handler.is_tx_ready());
+    }
 }
