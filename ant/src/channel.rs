@@ -57,3 +57,56 @@ pub trait RxHandler<T> {
     // TODO async versions
     fn try_recv(&self) -> Result<T, RxError>;
 }
+
+#[cfg(not(no_std))]
+pub mod mpsc {
+    use super::*;
+    use std::sync::mpsc::{Sender, Receiver};
+
+    /// Abstraction implementation for std::sync::mpsc::Receiver
+    ///
+    /// Uses non-blocking calls
+    pub struct RxChannel<T> {
+        pub receiver: Receiver<T>
+    }
+
+    /// Abstraction implementation for std::sync::mpsc::Receiver
+    ///
+    /// Uses blocking calls
+    pub struct BlockingRxChannel<T> {
+        pub receiver: Receiver<T>
+    }
+
+    /// Abstraction implementation for std::sync::mpsc::Sender
+    pub struct TxChannel<T> {
+        pub sender: Sender<T>
+    }
+
+    impl<T> TxHandler<T> for TxChannel<T> {
+        fn try_send(&self, msg: T) -> Result<(), TxError> {
+            match self.sender.send(msg) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(TxError::Closed),
+            }
+        }
+    }
+
+    impl<T> RxHandler<T> for RxChannel<T> {
+        fn try_recv(&self) -> Result<T, RxError> {
+            match self.receiver.try_recv() {
+                Ok(m) => Ok(m),
+                Err(_) => Err(RxError::Closed),
+            }
+        }
+    }
+
+    impl<T> RxHandler<T> for BlockingRxChannel<T> {
+        fn try_recv(&self) -> Result<T, RxError> {
+            match self.receiver.recv() {
+                Ok(m) => Ok(m),
+                Err(_) => Err(RxError::Closed),
+            }
+        }
+    }
+}
+
