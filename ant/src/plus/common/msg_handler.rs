@@ -551,6 +551,7 @@ mod tests {
     use core::time::Duration;
     fn get_config() -> ChannelConfig {
         ChannelConfig {
+            channel: 4,
             device_number: 1234,
             network_key_index: 0,
             device_type: 5,
@@ -596,14 +597,8 @@ mod tests {
     }
 
     #[test]
-    fn inert_start() {
-        let mut msg_handler = MessageHandler::new(4, &get_config());
-        assert!(msg_handler.send_message().is_none());
-    }
-
-    #[test]
     fn assign_config() {
-        let mut msg_handler = MessageHandler::new(4, &get_config());
+        let mut msg_handler = MessageHandler::new(&get_config());
         let data = get_config_message(&mut msg_handler, TxMessageId::AssignChannel);
         if let TxMessage::AssignChannel(data) = data {
             assert_eq!(data.data.channel_number, 4);
@@ -617,7 +612,7 @@ mod tests {
 
     #[test]
     fn close_state() {
-        let mut msg_handler = MessageHandler::new(4, &get_config());
+        let mut msg_handler = MessageHandler::new(&get_config());
         let data = get_config_message(&mut msg_handler, TxMessageId::CloseChannel);
         if let TxMessage::CloseChannel(data) = data {
             assert_eq!(data.channel_number, 4);
@@ -629,7 +624,6 @@ mod tests {
     #[test]
     fn unassign_state() {
         let mut msg_handler = MessageHandler::new(&get_config());
-        msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::UnAssignChannel);
         if let TxMessage::UnAssignChannel(data) = data {
             assert_eq!(data.channel_number, 4);
@@ -641,7 +635,6 @@ mod tests {
     #[test]
     fn channel_id_state() {
         let mut msg_handler = MessageHandler::new(&get_config());
-        msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::ChannelId);
         if let TxMessage::ChannelId(data) = data {
             assert_eq!(data.channel_number, 4);
@@ -663,7 +656,6 @@ mod tests {
     #[test]
     fn channel_frequency_state() {
         let mut msg_handler = MessageHandler::new(&get_config());
-        msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::ChannelRfFrequency);
         if let TxMessage::ChannelRfFrequency(data) = data {
             assert_eq!(data.channel_number, 4);
@@ -676,7 +668,6 @@ mod tests {
     #[test]
     fn channel_period_state() {
         let mut msg_handler = MessageHandler::new(&get_config());
-        msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::ChannelPeriod);
         if let TxMessage::ChannelPeriod(data) = data {
             assert_eq!(data.channel_number, 4);
@@ -689,7 +680,6 @@ mod tests {
     #[test]
     fn search_timeout_state() {
         let mut msg_handler = MessageHandler::new(&get_config());
-        msg_handler.set_channel(ChannelAssignment::Assigned(4));
         let data = get_config_message(&mut msg_handler, TxMessageId::SearchTimeout);
         if let TxMessage::SearchTimeout(data) = data {
             assert_eq!(data.channel_number, 4);
