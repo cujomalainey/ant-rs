@@ -7,7 +7,7 @@
 // except according to those terms.
 
 use crate::channel::duration_to_search_timeout;
-use crate::channel::{RxError, RxHandler, TxError, TxHandler};
+use crate::channel::{ChanError, RxHandler, TxHandler};
 use crate::messages::config::{
     ChannelType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
 };
@@ -173,7 +173,7 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
         Err(Error::UnsupportedDataPage(dp_num))
     }
 
-    pub fn process(&mut self) {
+    pub fn process(&mut self) -> Result<(), ChanError> {
         while let Ok(msg) = self.rx.try_recv() {
             if let Some(f) = self.rx_message_callback {
                 f(&msg);
@@ -195,14 +195,12 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
 
         // TODO handle errors
         if let Some(msg) = self.msg_handler.send_message() {
-            self.tx.try_send(msg).expect("TODO");
-            return;
+            self.tx.try_send(msg)?;
         }
         if let Some(callback) = self.tx_message_callback {
             if let Some(mut msg) = callback() {
                 msg.set_channel(self.msg_handler.get_channel());
-                self.tx.try_send(msg.into()).expect("TODO");
-                return;
+                self.tx.try_send(msg.into())?;
             }
         }
         if self.msg_handler.is_tx_ready() {
@@ -210,9 +208,10 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
                 if let Some(mut msg) = callback() {
                     msg.set_channel(self.msg_handler.get_channel());
                     self.msg_handler.tx_sent();
-                    self.tx.try_send(msg.into()).expect("TODO");
+                    self.tx.try_send(msg.into())?;
                 }
             }
         }
+        Ok(())
     }
 }

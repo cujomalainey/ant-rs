@@ -26,11 +26,11 @@ struct RxReceiver<T> {
 }
 
 impl<T: Default + Clone> TxHandler<T> for TxSender<T> {
-    fn try_send(&self, msg: T) -> Result<(), TxError<T>> {
+    fn try_send(&self, msg: T) -> Result<(), TxError> {
         match self.sender.try_send(msg) {
             Ok(_) => Ok(()),
-            Err(TrySendError::Full(m)) => Err(TxError::Full(m)),
-            Err(TrySendError::Closed(m)) => Err(TxError::Closed(m)),
+            Err(TrySendError::Full(_)) => Err(TxError::Full),
+            Err(TrySendError::Closed(_)) => Err(TxError::Closed),
             Err(_) => Err(TxError::UnknownError),
         }
     }
@@ -111,6 +111,6 @@ fn main() -> std::io::Result<()> {
     hr.open();
     loop {
         router.process().unwrap();
-        hr.process();
+        hr.process().unwrap();
     }
 }

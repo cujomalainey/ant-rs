@@ -24,15 +24,33 @@ pub enum RxError {
 }
 
 #[derive(Clone, Debug)]
-pub enum TxError<T> {
-    Full(T),
-    Closed(T),
+pub enum TxError {
+    Full,
+    Closed,
     UnknownError,
+}
+
+#[derive(Clone, Debug)]
+pub enum ChanError {
+    Rx(RxError),
+    Tx(TxError),
+}
+
+impl From<RxError> for ChanError {
+    fn from(err: RxError) -> ChanError {
+        ChanError::Rx(err)
+    }
+}
+
+impl From<TxError> for ChanError {
+    fn from(err: TxError) -> ChanError {
+        ChanError::Tx(err)
+    }
 }
 
 pub trait TxHandler<T> {
     // TODO async versions
-    fn try_send(&self, msg: T) -> Result<(), TxError<T>>;
+    fn try_send(&self, msg: T) -> Result<(), TxError>;
 }
 
 pub trait RxHandler<T> {

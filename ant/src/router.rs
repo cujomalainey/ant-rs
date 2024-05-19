@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::channel::{RxError, RxHandler, TxError, TxHandler};
+use crate::channel::{ChanError, RxHandler, TxError, TxHandler};
 use crate::drivers::{Driver, DriverError};
 use crate::messages::config::UnAssignChannel;
 use crate::messages::control::{CloseChannel, RequestMessage, RequestableMessageId, ResetSystem};
@@ -24,6 +24,13 @@ pub enum RouterError {
     ChannelOutOfBounds(),
     ChannelNotAssociated(),
     FailedToGetCapabilities(),
+    ChannelBufferError(ChanError),
+}
+
+impl From<TxError> for RouterError {
+    fn from(err: TxError) -> RouterError {
+        RouterError::ChannelBufferError(ChanError::Tx(err))
+    }
 }
 
 // This in theory is infinite, but its what the current hardware limit is.
@@ -152,17 +159,18 @@ impl<E, D: Driver<E>, T: TxHandler<AntMessage>, R: RxHandler<TxMessage>> Router<
             return Err(RouterError::ChannelOutOfBounds());
         }
         match &self.channels[channel as usize] {
-            Some(handler) => handler.try_send(msg).expect("TODO"),
+            Some(handler) => handler.try_send(msg)?,
             None => return Err(RouterError::ChannelNotAssociated()),
         };
         Ok(())
     }
 
-    fn broadcast_message(&self, msg: AntMessage) {
+    fn broadcast_message(&self, msg: AntMessage) -> Result<(), RouterError> {
         self.channels
             .iter()
             .flatten()
-            .for_each(|x| x.try_send(msg.clone()).expect("TODO"));
+            .try_for_each(|x| x.try_send(msg.clone()))?;
+        Ok(())
     }
 
     fn parse_capabilities(&self, msg: &Capabilities) {
@@ -192,27 +200,14 @@ impl<E, D: Driver<E>, T: TxHandler<AntMessage>, R: RxHandler<TxMessage>> Router<
             RxMessage::ChannelId(data) => self.route_message(data.channel_number, msg),
             // These messages can all provide actionable information to the profile but are not
             // channel specific
-            RxMessage::StartUpMessage(_) => {
-                self.broadcast_message(msg);
-                Ok(())
-            }
+            RxMessage::StartUpMessage(_) => self.broadcast_message(msg),
             RxMessage::Capabilities(data) => {
-                self.broadcast_message(msg.clone());
                 self.parse_capabilities(data);
-                Ok(())
+                self.broadcast_message(msg.clone())
             }
-            RxMessage::AdvancedBurstCapabilities(_) => {
-                self.broadcast_message(msg);
-                Ok(())
-            }
-            RxMessage::AdvancedBurstCurrentConfiguration(_) => {
-                self.broadcast_message(msg);
-                Ok(())
-            }
-            RxMessage::EncryptionModeParameters(_) => {
-                self.broadcast_message(msg);
-                Ok(())
-            }
+            RxMessage::AdvancedBurstCapabilities(_) => self.broadcast_message(msg),
+            RxMessage::AdvancedBurstCurrentConfiguration(_) => self.broadcast_message(msg),
+            RxMessage::EncryptionModeParameters(_) => self.broadcast_message(msg),
             // These message are not channel specific and operate at the router scope, should be
             // consumed directly at router callback
             RxMessage::EventFilter(_) => Ok(()),
