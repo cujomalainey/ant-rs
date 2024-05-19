@@ -61,25 +61,25 @@ pub trait RxHandler<T> {
 #[cfg(not(no_std))]
 pub mod mpsc {
     use super::*;
-    use std::sync::mpsc::{Sender, Receiver};
+    use std::sync::mpsc::{Receiver, Sender};
 
     /// Abstraction implementation for std::sync::mpsc::Receiver
     ///
     /// Uses non-blocking calls
     pub struct RxChannel<T> {
-        pub receiver: Receiver<T>
+        pub receiver: Receiver<T>,
     }
 
     /// Abstraction implementation for std::sync::mpsc::Receiver
     ///
     /// Uses blocking calls
     pub struct BlockingRxChannel<T> {
-        pub receiver: Receiver<T>
+        pub receiver: Receiver<T>,
     }
 
     /// Abstraction implementation for std::sync::mpsc::Sender
     pub struct TxChannel<T> {
-        pub sender: Sender<T>
+        pub sender: Sender<T>,
     }
 
     impl<T> TxHandler<T> for TxChannel<T> {
@@ -109,4 +109,3 @@ pub mod mpsc {
         }
     }
 }
-

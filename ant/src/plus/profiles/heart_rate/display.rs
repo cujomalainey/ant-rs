@@ -174,6 +174,7 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
     }
 
     pub fn process(&mut self) -> Result<(), ChanError> {
+        // TODO handle closed channel
         while let Ok(msg) = self.rx.try_recv() {
             if let Some(f) = self.rx_message_callback {
                 f(&msg);

@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::channel::duration_to_search_timeout;
+use crate::channel::{duration_to_search_timeout, ChanError, RxHandler, TxHandler};
 use crate::messages::config::{
     ChannelType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
 };
@@ -53,6 +53,10 @@ pub struct MonitorConfig {
     pub number_manufacturer_pages: u8,
     /// Number of main pages to send before a background cycle, must be <=65 to be spec compliant
     pub background_page_interval: u8,
+    /// Key index for ANT+ key
+    pub ant_plus_key_index: u8,
+    /// Channel this profile is installed at
+    pub channel: u8,
 }
 
 type RxDataPageCallback = fn(Result<DisplayTxDataPage, Error>);
@@ -81,7 +85,7 @@ const WEAVE_PATTERN: [TxDatapage; 8] = [
 /// When using this profile, mode changes initiaded by display must be triggered by your code. E.g.
 /// if display sends [ModeSettings] your code must call [Monitor::set_swim_mode]. This is so your code
 /// can update the config once it is ready to handle the new state.
-pub struct Monitor {
+pub struct Monitor<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> {
     msg_handler: MessageHandler,
     rx_message_callback: Option<fn(&AntMessage)>,
     rx_datapage_callback: RxDataPageCallback,
@@ -91,6 +95,8 @@ pub struct Monitor {
     in_swim_mode: bool,
     config: MonitorConfig,
     page_state: PageState,
+    sender: T,
+    receiver: R,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -106,11 +112,11 @@ pub enum TxDatapage {
     ManufacturerSpecific(u8),
 }
 
-impl Monitor {
+impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Monitor<T, R> {
     pub fn new(
         config: MonitorConfig,
-        ant_plus_key_index: u8,
-        channel: u8,
+        sender: T,
+        receiver: R,
         rx_datapage_callback: RxDataPageCallback,
         tx_datapage_callback: TxDatapageCallback,
     ) -> Self {
@@ -119,12 +125,14 @@ impl Monitor {
             rx_datapage_callback,
             tx_message_callback: None,
             tx_datapage_callback,
+            sender,
+            receiver,
             msg_handler: MessageHandler::new(&ChannelConfig {
-                channel,
+                channel: config.channel,
                 device_number: config.device_number,
                 device_type: DEVICE_TYPE,
                 channel_type: ChannelType::BidirectionalMaster,
-                network_key_index: ant_plus_key_index,
+                network_key_index: config.ant_plus_key_index,
                 transmission_type: TransmissionType::new(
                     TransmissionChannelType::IndependentChannel,
                     TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
@@ -165,7 +173,7 @@ impl Monitor {
     }
 
     /// Set callback for users to send channel specific config messages
-    /// is called continously every TX cycle until None is returned
+    /// is called continously every TX cycle
     pub fn set_tx_message_callback(&mut self, f: Option<fn() -> Option<TxMessageChannelConfig>>) {
         self.tx_message_callback = f;
     }
@@ -321,33 +329,33 @@ impl Monitor {
         }
     }
 
-    pub fn process(&mut self, msg: &AntMessage) {
-        if let Some(f) = self.rx_message_callback {
-            f(msg);
-        }
-        match msg.message {
-            RxMessage::BroadcastData(msg) => self.handle_dp(&msg.payload.data),
-            RxMessage::AcknowledgedData(msg) => self.handle_dp(&msg.payload.data),
-            _ => (),
-        }
-        match self.msg_handler.receive_message(msg) {
-            Ok(_) => (),
-            Err(e) => {
-                let f = self.rx_datapage_callback;
-                f(Err(e.into()));
+    pub fn process(&mut self) -> Result<(), ChanError> {
+        // TODO handle closed
+        while let Ok(msg) = self.receiver.try_recv() {
+            if let Some(f) = self.rx_message_callback {
+                f(&msg);
+            }
+            match msg.message {
+                RxMessage::BroadcastData(msg) => self.handle_dp(&msg.payload.data),
+                RxMessage::AcknowledgedData(msg) => self.handle_dp(&msg.payload.data),
+                _ => (),
+            }
+            match self.msg_handler.receive_message(&msg) {
+                Ok(_) => (),
+                Err(e) => {
+                    let f = self.rx_datapage_callback;
+                    f(Err(e.into()));
+                }
             }
         }
-    }
 
-    fn send_message(&mut self) -> Option<TxMessage> {
-        let msg = self.msg_handler.send_message();
-        if msg.is_some() {
-            return msg;
+        if let Some(msg) = self.msg_handler.send_message() {
+            self.sender.try_send(msg)?;
         }
         if let Some(callback) = self.tx_message_callback {
             if let Some(mut msg) = callback() {
                 msg.set_channel(self.msg_handler.get_channel());
-                return Some(msg.into());
+                self.sender.try_send(msg.into())?;
             }
         }
         if self.msg_handler.is_tx_ready() {
@@ -355,8 +363,8 @@ impl Monitor {
             let dp = self.get_next_datapage();
             let msg = BroadcastData::new(self.msg_handler.get_channel(), callback(&dp)); // TODO handle ack param
             self.msg_handler.tx_sent();
-            return Some(msg.into());
+            self.sender.try_send(msg.into())?;
         }
-        None
+        Ok(())
     }
 }

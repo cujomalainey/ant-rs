@@ -6,20 +6,22 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use ant::channel::mpsc::{RxChannel, TxChannel};
 use ant::drivers::{is_ant_usb_device_from_device, UsbDriver};
 use ant::messages::config::SetNetworkKey;
 use ant::plus::profiles::heart_rate::{
-    Capabilities, CommonData, Config, Features, MainDataPage, ManufacturerInformation,
-    ManufacturerSpecific, Monitor, PreviousHeartBeat, ProductInformation, TxDatapage,
+    Capabilities, CommonData, Features, MainDataPage, ManufacturerInformation,
+    ManufacturerSpecific, Monitor, MonitorConfig, PreviousHeartBeat, ProductInformation,
+    TxDatapage,
 };
 use ant::router::Router;
+
 // Needed for `pack` function calls
 use dialoguer::Select;
 use packed_struct::PackedStruct;
 use rusb::{Device, DeviceList};
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::mpsc::channel;
 
 // This function creates datapages for the purposes of this example, the generated datapages are
 // not to spec in any form or fashion and are strictly here to show how generation works
@@ -82,10 +84,22 @@ fn main() -> std::io::Result<()> {
 
     let driver = UsbDriver::new(device).unwrap();
 
-    let mut router = Router::new(driver).unwrap();
+    let (router_tx, monitor_rx) = channel();
+    let (monitor_tx, router_rx) = channel();
+
+    let mut router = Router::new(
+        driver,
+        RxChannel {
+            receiver: router_rx,
+        },
+    )
+    .unwrap();
     let snk = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // Get this from thisisant.com
+    let channel = router
+        .add_channel(TxChannel { sender: router_tx })
+        .expect("Add channel failed");
     router.send(&snk).expect("failed to set network key");
-    let config = Config {
+    let config = MonitorConfig {
         device_number: 12345,
         transmission_type_extension: 12.into(),
         main_data_page: MainDataPage::PreviousHeartBeat,
@@ -95,20 +109,24 @@ fn main() -> std::io::Result<()> {
         gym_mode_supported: false,
         number_manufacturer_pages: 2,
         background_page_interval: 64,
+        ant_plus_key_index: 0,
+        channel: channel,
     };
-    let hr = Rc::new(RefCell::new(Monitor::new(
+    let mut hr = Monitor::new(
         config,
-        0,
+        TxChannel { sender: monitor_tx },
+        RxChannel {
+            receiver: monitor_rx,
+        },
         |x| println!("{:#?}", x),
         |datapage| make_datapage(datapage),
-    )));
+    );
     // hr.borrow_mut()
     //     .set_rx_datapage_callback(Some(|x| println!("{:#?}", x)));
-    hr.borrow_mut()
-        .set_rx_message_callback(Some(|x| println!("{:#?}", x)));
-    router.add_channel(hr.clone()).expect("Add channel failed");
-    hr.borrow_mut().open();
+    hr.set_rx_message_callback(Some(|x| println!("{:#?}", x)));
+    hr.open();
     loop {
         router.process().unwrap();
+        hr.process().unwrap();
     }
 }

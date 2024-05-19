@@ -321,7 +321,7 @@ impl MessageHandler {
             channel: channel_config.channel,
             configure_state: &UNKNOWN_CLOSE_STATE,
             set_channel_state: None,
-            tx_ready: true,
+            tx_ready: false,
             pairing_request: DevicePairingState::BitCleared,
             configure_pending_response: false,
             channel_state: ChannelState::UnAssigned,
@@ -345,7 +345,7 @@ impl MessageHandler {
     ///
     /// Slave channels: If a wildcard was set and device has not connected yet a wildcard will be returned.
     /// Recommended to be called after [MessageHandler::is_tracking] returns tracking at least once or you
-    /// have observed a datapage recieved
+    /// have observed a datapage received
     ///
     /// Master channels: returns the ID being broadcasted
     pub fn get_device_id(&self) -> u16 {
@@ -411,8 +411,14 @@ impl MessageHandler {
         // Handle channel open close command
         if let Some(command) = &self.set_channel_state {
             let msg = match command {
-                ChannelStateCommand::Open => OpenChannel::new(self.channel).into(),
-                ChannelStateCommand::Close => CloseChannel::new(self.channel).into(),
+                ChannelStateCommand::Open => {
+                    self.tx_ready = true;
+                    OpenChannel::new(self.channel).into()
+                }
+                ChannelStateCommand::Close => {
+                    self.tx_ready = false;
+                    CloseChannel::new(self.channel).into()
+                }
             };
             self.set_channel_state = None;
             return Some(msg);
