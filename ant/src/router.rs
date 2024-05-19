@@ -6,12 +6,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::channel::{RxError, RxHandler, TxError, TxHandler};
 use crate::drivers::{Driver, DriverError};
 use crate::messages::config::UnAssignChannel;
 use crate::messages::control::{CloseChannel, RequestMessage, RequestableMessageId, ResetSystem};
 use crate::messages::requested_response::Capabilities;
 use crate::messages::{AntMessage, RxMessage, TransmitableMessage, TxMessage};
-use crate::channel::{TxHandler, RxHandler, TxError, RxError};
 
 use std::cell::Cell;
 use std::marker::PhantomData;
@@ -95,11 +95,7 @@ impl<E, D: Driver<E>, T: TxHandler<AntMessage>, R: RxHandler<TxMessage>> Router<
     }
 
     /// Add channel at a specific index
-    pub fn add_channel_at_index(
-        &mut self,
-        channel: T,
-        index: usize,
-    ) -> Result<(), RouterError> {
+    pub fn add_channel_at_index(&mut self, channel: T, index: usize) -> Result<(), RouterError> {
         if index >= self.max_channels.get() {
             return Err(RouterError::ChannelOutOfBounds());
         }

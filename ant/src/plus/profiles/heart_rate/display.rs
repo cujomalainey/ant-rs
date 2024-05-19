@@ -7,6 +7,7 @@
 // except according to those terms.
 
 use crate::channel::duration_to_search_timeout;
+use crate::channel::{RxError, RxHandler, TxError, TxHandler};
 use crate::messages::config::{
     ChannelType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
 };
@@ -20,7 +21,6 @@ use crate::plus::profiles::heart_rate::{
     DEVICE_TYPE,
 };
 use crate::plus::NETWORK_RF_FREQUENCY;
-use crate::channel::{RxError, RxHandler, TxError, TxHandler};
 
 use packed_struct::prelude::{packed_bits::Bits, Integer};
 use packed_struct::{PackedStruct, PrimitiveEnum};

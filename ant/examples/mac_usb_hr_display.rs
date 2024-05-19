@@ -6,16 +6,16 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use ant::channel::{RxError, RxHandler, TxError, TxHandler};
 use ant::drivers::{is_ant_usb_device_from_device, UsbDriver};
 use ant::messages::config::SetNetworkKey;
 use ant::plus::profiles::heart_rate::{Display, DisplayConfig, Period};
 use ant::router::Router;
-use ant::channel::{TxError, RxError, RxHandler, TxHandler};
 use dialoguer::Select;
 use rusb::{Device, DeviceList};
 
-use thingbuf::mpsc::{channel, Sender, Receiver};
-use thingbuf::mpsc::errors::{TrySendError, TryRecvError};
+use thingbuf::mpsc::errors::{TryRecvError, TrySendError};
+use thingbuf::mpsc::{channel, Receiver, Sender};
 
 struct TxSender<T> {
     sender: Sender<T>,
@@ -80,10 +80,18 @@ fn main() -> std::io::Result<()> {
     let (channel_tx, router_rx) = channel(8);
     let (router_tx, channel_rx) = channel(8);
 
-    let mut router = Router::new(driver, RxReceiver {receiver: router_rx}).unwrap();
+    let mut router = Router::new(
+        driver,
+        RxReceiver {
+            receiver: router_rx,
+        },
+    )
+    .unwrap();
     let snk = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // Get this from thisisant.com
     router.send(&snk).expect("failed to set network key");
-    let chan = router.add_channel(TxSender{ sender: router_tx} ).expect("Add channel failed");
+    let chan = router
+        .add_channel(TxSender { sender: router_tx })
+        .expect("Add channel failed");
     let config = DisplayConfig {
         device_number: 0,
         device_number_extension: 0.into(),
@@ -91,7 +99,13 @@ fn main() -> std::io::Result<()> {
         period: Period::FourHz,
         ant_plus_key_index: 0,
     };
-    let mut hr = Display::new(config, TxSender {sender:channel_tx}, RxReceiver {receiver:channel_rx});
+    let mut hr = Display::new(
+        config,
+        TxSender { sender: channel_tx },
+        RxReceiver {
+            receiver: channel_rx,
+        },
+    );
     hr.set_rx_datapage_callback(Some(|x| println!("{:#?}", x)));
     hr.set_rx_message_callback(Some(|x| println!("{:#?}", x)));
     hr.open();
