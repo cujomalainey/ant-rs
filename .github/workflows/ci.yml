@@ -5,29 +5,29 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
             components: clippy
-      - run: cargo clippy --no-deps
-      - run: cargo clippy --no-deps --all-features
+      - run: cargo clippy --no-deps -- -Dwarnings
+      - run: cargo clippy --no-deps --no-default-features -- -Dwarnings
 
   docs:
     name: Docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
             components: rust-docs
       - run: cargo doc --no-deps
-      - run: cargo doc --no-deps --all-features
+      - run: cargo doc --no-deps --no-default-features
 
   format:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
             components: rustfmt
@@ -36,18 +36,22 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo build --release
-      - run: cargo build --release --all-features
-      - run: cargo build --example linux_usb
-      - run: cargo build --example mac_usb --all-features
-      - run: cargo build --example mac_usb_hr_display --all-features
+      - run: cargo install cargo-afl
+      - run: cargo build --release --workspace --exclude serial-fuzz-target
+      - run: cargo build --release --no-default-features --workspace --exclude serial-fuzz-target
+      - run: cargo afl build --package serial-fuzz-target
+      - run: cargo build --example linux_usb --no-default-features --features "alloc std"
+      - run: cargo build --example mac_usb
+      - run: cargo build --example mac_usb_hr_display
+      - run: cargo build --example mac_usb_hr_monitor
+      - run: cargo build --example mac_usb_tx
       - run: cargo build --example no_std_ant --no-default-features
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --tests

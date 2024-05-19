@@ -7,13 +7,22 @@
 // except according to those terms.
 
 use ant::drivers::*;
-use ant::messages::*;
+use ant::messages::config::{
+    AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
+    LibConfig, SetNetworkKey, TransmissionType,
+};
+use ant::messages::control::{OpenChannel, ResetSystem};
 
 use linux_embedded_hal::Serial;
 
+use std::env;
+
 fn main() -> std::io::Result<()> {
-    // TODO make the tty an arguement
-    let serial = Serial::open("/dev/tty123456789").expect("Serial failed to open");
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 1 {
+        panic!("Expected single arguement TTY")
+    }
+    let serial = Serial::open(args[0].clone(), 115200).expect("Serial failed to open");
     let mut driver = SerialDriver::<_, StubPin>::new(serial, None);
     let assign = AssignChannel::new(0, ChannelType::BidirectionalSlave, 0, None);
     let key = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // get this

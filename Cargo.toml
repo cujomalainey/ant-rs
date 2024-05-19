@@ -3,4 +3,6 @@ members = [
     "ant/",
     "ant-derive",
     "ant-sys",
+    "serial-fuzz-target",
 ]
+resolver = "2"

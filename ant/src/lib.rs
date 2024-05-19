@@ -27,6 +27,7 @@
 //!  * Support for all documented modern messages with optional fields
 //!  * Byte transport is abstracted so any platform can be used
 //!  * No direct heap usage when only using the drivers
+//!  * no_std support
 //!
 //! ## Roadmap
 //!  * Softdevice support
@@ -36,20 +37,18 @@
 //!  * Safe processing of data (no_panic)
 //!  * Extended format support
 //!     * ANT-FS support
-//!  * no_std support
 //!  * Provide hooks for user to parse unknown messages/formats
-//!
-//! TODO TX example via usb
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core as std;
 
+pub mod channel;
 pub mod drivers;
-pub mod fields;
 pub mod messages;
 pub mod plus;
-#[cfg(feature = "usb")]
-pub mod usb;
+#[cfg(feature = "alloc")]
+pub mod router;

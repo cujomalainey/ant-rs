@@ -7,14 +7,17 @@
 // except according to those terms.
 
 use ant::drivers::*;
+use ant::messages::channel::MessageCode;
 use ant::messages::config::{
     AssignChannel, ChannelId, ChannelPeriod, ChannelRfFrequency, ChannelType, DeviceType,
-    LibConfig, SetNetworkKey, TransmissionType,
+    TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType,
 };
 use ant::messages::control::{OpenChannel, ResetSystem};
-use rusb::{Device, DeviceList};
+use ant::messages::data::BroadcastData;
+use ant::messages::RxMessage;
 
 use dialoguer::Select;
+use rusb::{Device, DeviceList};
 
 fn main() -> std::io::Result<()> {
     let mut devices: Vec<Device<_>> = DeviceList::new()
@@ -45,35 +48,48 @@ fn main() -> std::io::Result<()> {
     };
 
     let mut driver = UsbDriver::new(device).unwrap();
-    let assign = AssignChannel::new(0, ChannelType::BidirectionalSlave, 0, None);
-    let key = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // get this
-                                                                                       // from
-                                                                                       // thisisant.com
-    let rf = ChannelRfFrequency::new(0, 57);
+
+    let assign = AssignChannel::new(0, ChannelType::BidirectionalMaster, 0, None);
+    // Skip setting the public key so we use th public channel by default
+    let rf = ChannelRfFrequency::new(0, 23);
     let id = ChannelId::new(
         0,
-        0,
-        DeviceType::new(120.into(), false),
-        TransmissionType::new_wildcard(),
+        123,
+        DeviceType::new(89.into(), false),
+        TransmissionType::new(
+            TransmissionChannelType::IndependentChannel,
+            TransmissionGlobalDataPages::GlobalDataPagesNotUsed,
+            0xF.into(),
+        ),
     );
-    let period = ChannelPeriod::new(0, 8070);
-    let libconfig = LibConfig::new(true, true, true);
+    let period = ChannelPeriod::new(0, 1000);
+    let mut data = BroadcastData::new(0, [0, 0, 0, 0, 0, 0, 0, 0]);
     driver
         .send_message(&ResetSystem::new())
         .expect("Failed to reset device");
-    driver.send_message(&key).expect("Message failed");
     driver.send_message(&assign).expect("Message failed");
     driver.send_message(&id).expect("Message failed");
     driver.send_message(&period).expect("Message failed");
     driver.send_message(&rf).expect("Message failed");
-    driver.send_message(&libconfig).expect("Message failed");
     driver
         .send_message(&OpenChannel::new(0))
         .expect("Message failed");
+    driver.send_message(&data).expect("Message failed");
     loop {
         match driver.get_message() {
             Ok(None) => (),
-            msg => println!("{:#?}", msg),
+            Ok(Some(msg)) => match &msg.message {
+                RxMessage::ChannelEvent(msg) => match msg.payload.message_code {
+                    MessageCode::EventTx => {
+                        data.payload.data[0] = data.payload.data[0].overflowing_add(1).0;
+                        println!("Sending [0][0][0][0][0][0][0][{}]!", data.payload.data[0]);
+                        driver.send_message(&data).expect("Message failed");
+                    }
+                    evt => println!("Event {:#?}", evt),
+                },
+                msg => println!("Got: {:#?}", msg),
+            },
+            msg => println!("Error: {:#?}", msg),
         }
     }
 }
