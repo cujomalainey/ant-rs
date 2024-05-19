@@ -11,11 +11,10 @@ use crate::messages::config::UnAssignChannel;
 use crate::messages::control::{CloseChannel, RequestMessage, RequestableMessageId, ResetSystem};
 use crate::messages::requested_response::Capabilities;
 use crate::messages::{AntMessage, RxMessage, TransmitableMessage, TxMessage};
+use crate::channel::{TxHandler, RxHandler, TxError, RxError};
 
 use std::cell::Cell;
 use std::marker::PhantomData;
-
-use thingbuf::mpsc::{Receiver, Sender};
 
 #[derive(Debug)]
 pub enum RouterError {
@@ -31,13 +30,13 @@ pub enum RouterError {
 /// Highest known supported channel count on a ANT device
 pub const MAX_CHANNELS: usize = 15;
 
-pub struct Router<E, D: Driver<E>> {
-    channels: [Option<Sender<AntMessage>>; MAX_CHANNELS],
+pub struct Router<E, D: Driver<E>, T: TxHandler<AntMessage>, R: RxHandler<TxMessage>> {
+    channels: [Option<T>; MAX_CHANNELS],
     max_channels: Cell<usize>, // what the hardware reports as some have less than max
     driver: D,
     reset_restore: Cell<bool>,
     rx_message_callback: Option<fn(&AntMessage)>,
-    receiver: Receiver<TxMessage>,
+    receiver: R,
     _marker: PhantomData<E>,
 }
 
@@ -50,9 +49,9 @@ impl<E> From<DriverError<E>> for RouterError {
 
 const ROUTER_CAPABILITIES_RETRIES: u8 = 25;
 
-impl<E, D: Driver<E>> Router<E, D> {
+impl<E, D: Driver<E>, T: TxHandler<AntMessage>, R: RxHandler<TxMessage>> Router<E, D, T, R> {
     // TODO change to generic receiver
-    pub fn new(mut driver: D, receiver: Receiver<TxMessage>) -> Result<Self, RouterError> {
+    pub fn new(mut driver: D, receiver: R) -> Result<Self, RouterError> {
         // Reset system so we are coherent
         driver.send_message(&ResetSystem::new())?;
         // Purge driver state
@@ -63,9 +62,8 @@ impl<E, D: Driver<E>> Router<E, D> {
             RequestableMessageId::Capabilities,
             None,
         ))?;
-        const ARRAY_INIT: Option<Sender<AntMessage>> = None;
         let mut router = Self {
-            channels: [ARRAY_INIT; MAX_CHANNELS],
+            channels: std::array::from_fn(|_| None),
             max_channels: Cell::new(0),
             reset_restore: Cell::new(false),
             driver,
@@ -86,7 +84,7 @@ impl<E, D: Driver<E>> Router<E, D> {
     }
 
     /// Add a channel at next available index
-    pub fn add_channel(&mut self, channel: Sender<AntMessage>) -> Result<u8, RouterError> {
+    pub fn add_channel(&mut self, channel: T) -> Result<u8, RouterError> {
         let index = self.channels.iter().position(|x| x.is_none());
         let index = match index {
             Some(x) => x,
@@ -99,7 +97,7 @@ impl<E, D: Driver<E>> Router<E, D> {
     /// Add channel at a specific index
     pub fn add_channel_at_index(
         &mut self,
-        channel: Sender<AntMessage>,
+        channel: T,
         index: usize,
     ) -> Result<(), RouterError> {
         if index >= self.max_channels.get() {

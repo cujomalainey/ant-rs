@@ -10,10 +10,42 @@ use ant::drivers::{is_ant_usb_device_from_device, UsbDriver};
 use ant::messages::config::SetNetworkKey;
 use ant::plus::profiles::heart_rate::{Display, DisplayConfig, Period};
 use ant::router::Router;
+use ant::channel::{TxError, RxError, RxHandler, TxHandler};
 use dialoguer::Select;
 use rusb::{Device, DeviceList};
 
-use thingbuf::mpsc::channel;
+use thingbuf::mpsc::{channel, Sender, Receiver};
+use thingbuf::mpsc::errors::{TrySendError, TryRecvError};
+
+struct TxSender<T> {
+    sender: Sender<T>,
+}
+
+struct RxReceiver<T> {
+    receiver: Receiver<T>,
+}
+
+impl<T: Default + Clone> TxHandler<T> for TxSender<T> {
+    fn try_send(&self, msg: T) -> Result<(), TxError<T>> {
+        match self.sender.try_send(msg) {
+            Ok(_) => Ok(()),
+            Err(TrySendError::Full(m)) => Err(TxError::Full(m)),
+            Err(TrySendError::Closed(m)) => Err(TxError::Closed(m)),
+            Err(_) => Err(TxError::UnknownError),
+        }
+    }
+}
+
+impl<T: Default + Clone> RxHandler<T> for RxReceiver<T> {
+    fn try_recv(&self) -> Result<T, RxError> {
+        match self.receiver.try_recv() {
+            Ok(e) => Ok(e),
+            Err(TryRecvError::Empty) => Err(RxError::Empty),
+            Err(TryRecvError::Closed) => Err(RxError::Closed),
+            Err(_) => Err(RxError::UnknownError),
+        }
+    }
+}
 
 fn main() -> std::io::Result<()> {
     let mut devices: Vec<Device<_>> = DeviceList::new()
@@ -48,10 +80,10 @@ fn main() -> std::io::Result<()> {
     let (channel_tx, router_rx) = channel(8);
     let (router_tx, channel_rx) = channel(8);
 
-    let mut router = Router::new(driver, router_rx).unwrap();
+    let mut router = Router::new(driver, RxReceiver {receiver: router_rx}).unwrap();
     let snk = SetNetworkKey::new(0, [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]); // Get this from thisisant.com
     router.send(&snk).expect("failed to set network key");
-    let chan = router.add_channel(router_tx).expect("Add channel failed");
+    let chan = router.add_channel(TxSender{ sender: router_tx} ).expect("Add channel failed");
     let config = DisplayConfig {
         device_number: 0,
         device_number_extension: 0.into(),
@@ -59,9 +91,9 @@ fn main() -> std::io::Result<()> {
         period: Period::FourHz,
         ant_plus_key_index: 0,
     };
-    let mut hr = Display::new(config, channel_tx, channel_rx);
+    let mut hr = Display::new(config, TxSender {sender:channel_tx}, RxReceiver {receiver:channel_rx});
     hr.set_rx_datapage_callback(Some(|x| println!("{:#?}", x)));
-    //   hr.set_rx_message_callback(Some(|x| println!("{:#?}", x)));
+    hr.set_rx_message_callback(Some(|x| println!("{:#?}", x)));
     hr.open();
     loop {
         router.process().unwrap();

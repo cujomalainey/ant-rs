@@ -20,22 +20,21 @@ use crate::plus::profiles::heart_rate::{
     DEVICE_TYPE,
 };
 use crate::plus::NETWORK_RF_FREQUENCY;
+use crate::channel::{RxError, RxHandler, TxError, TxHandler};
 
 use packed_struct::prelude::{packed_bits::Bits, Integer};
 use packed_struct::{PackedStruct, PrimitiveEnum};
 
 use std::time::Duration;
 
-use thingbuf::mpsc::{Receiver, Sender};
-
-pub struct Display {
+pub struct Display<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> {
     msg_handler: MessageHandler,
     rx_message_callback: Option<fn(&AntMessage)>,
     rx_datapage_callback: Option<fn(Result<MonitorTxDataPage, Error>)>,
     tx_message_callback: Option<fn() -> Option<TxMessageChannelConfig>>,
     tx_datapage_callback: Option<fn() -> Option<TxMessageData>>,
-    tx: Sender<TxMessage>,
-    rx: Receiver<AntMessage>,
+    tx: T,
+    rx: R,
 }
 
 pub struct DisplayConfig {
@@ -46,12 +45,12 @@ pub struct DisplayConfig {
     pub period: Period,
 }
 
-impl Display {
+impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
     pub fn new(
         conf: DisplayConfig,
         // TODO make this a type
-        tx: Sender<TxMessage>,
-        rx: Receiver<AntMessage>,
+        tx: T,
+        rx: R,
     ) -> Self {
         let transmission_type = if conf.device_number_extension == 0.into() {
             TransmissionType::new_wildcard()

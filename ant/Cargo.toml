@@ -23,8 +23,6 @@ embedded-hal-nb = "1.0"
 nb = "1.1"
 rusb = {version = "0.9", optional = true}
 derive-new = {version = "0.6", default-features = false}
-# TODO remove once buffer abstraction is complete
-thingbuf = "0.1"
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 linux-embedded-hal = "0.4"
@@ -32,6 +30,7 @@ linux-embedded-hal = "0.4"
 [dev-dependencies]
 dialoguer = "0.11"
 inner = "0.1"
+thingbuf = "0.1"
 
 [features]
 default = ["std", "alloc", "usb", "usb_adapter"]
