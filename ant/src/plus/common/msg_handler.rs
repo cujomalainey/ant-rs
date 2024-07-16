@@ -707,7 +707,24 @@ mod tests {
 
     #[test]
     fn state_transition_on_failure() {
-        // TODO
+        let mut msg_handler = MessageHandler::new(&get_config());
+        assert!(msg_handler.configure_state.get_state() != ConfigureStateId::Error);
+        get_config_message(&mut msg_handler, TxMessageId::AssignChannel);
+        let result = msg_handler.receive_message( &AntMessage {
+            header: RxMessageHeader {
+                sync: RxSyncByte::Write,
+                msg_id: crate::messages::RxMessageId::ChannelEvent,
+                msg_length: 3,
+            },
+            message: RxMessage::ChannelResponse(ChannelResponse {
+                channel_number: 0,
+                message_id: TxMessageId::AssignChannel,
+                message_code: MessageCode::InvalidMessage,
+            }),
+            checksum: 123, // this doesn't matter
+        });
+        assert!(msg_handler.configure_state.get_state() == ConfigureStateId::Error);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -732,7 +749,28 @@ mod tests {
 
     #[test]
     fn reset() {
-        // TODO
+        let mut msg_handler = MessageHandler::new(&get_config());
+        get_config_message(&mut msg_handler, TxMessageId::AssignChannel);
+        let _ = msg_handler.receive_message( &AntMessage {
+            header: RxMessageHeader {
+                sync: RxSyncByte::Write,
+                msg_id: crate::messages::RxMessageId::ChannelEvent,
+                msg_length: 3,
+            },
+            message: RxMessage::ChannelResponse(ChannelResponse {
+                channel_number: 0,
+                message_id: TxMessageId::AssignChannel,
+                message_code: MessageCode::InvalidMessage,
+            }),
+            checksum: 123, // this doesn't matter
+        });
+        msg_handler.state_config.device_number = 25;
+        assert!(msg_handler.configure_state.get_state() == ConfigureStateId::Error);
+        msg_handler.reset_state(false);
+        assert!(msg_handler.configure_state.get_state() == ConfigureStateId::UnknownClose);
+        assert!(msg_handler.state_config.device_number == 25);
+        msg_handler.reset_state(true);
+        assert!(msg_handler.state_config.device_number == get_config().device_number);
     }
 
     #[test]
