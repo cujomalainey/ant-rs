@@ -83,7 +83,7 @@ impl<E> From<arrayvec::CapacityError> for DriverError<E> {
     }
 }
 
-fn calculate_checksum(buf: &[u8]) -> u8 {
+pub fn calculate_checksum(buf: &[u8]) -> u8 {
     buf.iter().fold(0, |acc, x| acc ^ x)
 }
 
