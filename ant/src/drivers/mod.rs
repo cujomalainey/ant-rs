@@ -83,7 +83,7 @@ impl<E> From<arrayvec::CapacityError> for DriverError<E> {
     }
 }
 
-fn calculate_checksum(buf: &[u8]) -> u8 {
+pub fn calculate_checksum(buf: &[u8]) -> u8 {
     buf.iter().fold(0, |acc, x| acc ^ x)
 }
 
@@ -138,7 +138,8 @@ const HEADER_SIZE: usize = 3;
 
 type Buffer = ArrayVec<u8, ANT_MESSAGE_SIZE>;
 
-fn parse_buffer<E>(buf: &[u8]) -> Result<Option<AntMessage>, DriverError<E>> {
+/// Parse raw bytes into an `AntMessage`
+pub fn parse_buffer<E>(buf: &[u8]) -> Result<Option<AntMessage>, DriverError<E>> {
     // Not enough bytes
     if buf.len() < HEADER_SIZE {
         return Ok(None);
