@@ -1,5 +1,5 @@
-use packed_struct::derive::PackedStruct;
 use derive_new::new;
+use packed_struct::derive::PackedStruct;
 
 const DEVICE_TYPE: u8 = 121;
 
@@ -24,9 +24,11 @@ impl SpeedAndCadence {
     pub fn cadence(a: SpeedAndCadence, b: SpeedAndCadence) -> Option<f32> {
         let time_delta = b.cadence_event_time.wrapping_sub(a.cadence_event_time);
         if time_delta == 0 {
-            return None
+            return None;
         }
-        let rev_delta = b.cadence_revolution_count.wrapping_sub(a.cadence_revolution_count);
+        let rev_delta = b
+            .cadence_revolution_count
+            .wrapping_sub(a.cadence_revolution_count);
         Some((rev_delta as f32) * 1024.0 * 60.0 / (time_delta as f32))
     }
 
@@ -34,15 +36,18 @@ impl SpeedAndCadence {
     pub fn wheel_revolutions(a: SpeedAndCadence, b: SpeedAndCadence) -> Option<u16> {
         let time_delta = b.speed_event_time.wrapping_sub(a.speed_event_time);
         if time_delta == 0 {
-            return None
+            return None;
         }
-        Some(b.speed_revolution_count.wrapping_sub(a.speed_revolution_count))
+        Some(
+            b.speed_revolution_count
+                .wrapping_sub(a.speed_revolution_count),
+        )
     }
 
     /// Calculates the distance (m) covered between two messages
     pub fn distance(a: SpeedAndCadence, b: SpeedAndCadence, circumference: f32) -> Option<f32> {
         if let Some(revs) = Self::wheel_revolutions(a, b) {
-            return Some(revs as f32 * circumference)
+            return Some(revs as f32 * circumference);
         }
         None
     }
@@ -51,7 +56,7 @@ impl SpeedAndCadence {
     pub fn speed_revs_per_sec(a: SpeedAndCadence, b: SpeedAndCadence) -> Option<f32> {
         if let Some(revs) = Self::wheel_revolutions(a, b) {
             let time_delta = b.speed_event_time.wrapping_sub(a.speed_event_time);
-            return Some(revs as f32 * 1024.0 / time_delta as f32)
+            return Some(revs as f32 * 1024.0 / time_delta as f32);
         }
         None
     }
@@ -59,7 +64,7 @@ impl SpeedAndCadence {
     /// Calculates average speed (m/s)
     pub fn speed(a: SpeedAndCadence, b: SpeedAndCadence, circumference: f32) -> Option<f32> {
         if let Some(speed) = Self::speed_revs_per_sec(a, b) {
-            return Some(speed * circumference)
+            return Some(speed * circumference);
         }
         None
     }
@@ -67,8 +72,8 @@ impl SpeedAndCadence {
 
 #[cfg(test)]
 mod tests {
-    use packed_struct::PackedStruct;
     use super::*;
+    use packed_struct::PackedStruct;
 
     #[test]
     fn unpack() {
@@ -107,8 +112,8 @@ mod tests {
         assert!((SpeedAndCadence::speed(a, b, 1.0).unwrap() - 1.0).abs() <= f32::EPSILON);
 
         // test counter roll-over
-        let a = SpeedAndCadence::new( 0, 0, u16::MAX, u16::MAX);
-        let b = SpeedAndCadence::new( 0, 0, 1023, 0);
+        let a = SpeedAndCadence::new(0, 0, u16::MAX, u16::MAX);
+        let b = SpeedAndCadence::new(0, 0, 1023, 0);
         assert!((SpeedAndCadence::speed(a, b, 1.0).unwrap() - 1.0).abs() <= f32::EPSILON);
     }
 }
