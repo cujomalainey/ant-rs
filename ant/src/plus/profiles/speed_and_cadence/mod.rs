@@ -1,7 +1,7 @@
 use derive_new::new;
 use packed_struct::derive::PackedStruct;
 
-const DEVICE_TYPE: u8 = 121;
+pub const DEVICE_TYPE: u8 = 121;
 
 #[derive(PackedStruct, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(endian = "lsb")]
