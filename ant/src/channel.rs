@@ -9,6 +9,7 @@
 use const_utils::u64::min;
 use core::time::Duration;
 
+// TODO move this somewhere more appropriate
 /// Helper to convert durations to search timeouts.
 /// Anything greater than or equal to 637.5s will default to inifinite timeout per ANT spec.
 pub const fn duration_to_search_timeout(t: Duration) -> u8 {
