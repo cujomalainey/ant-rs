@@ -123,20 +123,13 @@ fn main() -> std::io::Result<()> {
 
         // Every 5 seconds, increase the target power by 50 watts
         if last_send_time.elapsed() >= Duration::from_secs(5) {
-            let target_power = 50 * resistance_multiplier * 4;
-            println!("Setting target power to {} : {}", (target_power & 0xFF) as u8, (target_power >> 8) as u8);
-            let message: TxMessage = AcknowledgedData::new(chan, [
-                0x31,
-                0x00,
-                0x00,
-                0x00,
-                0x00,
-                0x00,
-                (target_power & 0xFF) as u8,
-                (target_power >> 8) as u8,
-            ]).into();
-            router.send(&message).expect("Failed to send message");
-            println!("Sent target power: {} watts", target_power / 4);
+            let target_power = 50 * resistance_multiplier;
+            println!("Setting power target to {} watts", target_power);
+
+            if let Err(_) = tacx.set_power_target(target_power) {
+                println!("Failed to send power target");
+            }
+
             resistance_multiplier += 1;
             last_send_time = Instant::now();
         }

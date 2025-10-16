@@ -3,6 +3,7 @@ use crate::channel::{ChanError, RxHandler, TxHandler};
 use crate::messages::config::{
     ChannelType, TransmissionChannelType, TransmissionGlobalDataPages, TransmissionType
 };
+use crate::messages::data::AcknowledgedData;
 use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig, TxMessageData};
 // use crate::plus::common::datapages::MANUFACTURER_SPECIFIC_RANGE;
 use crate::plus::common::msg_handler::{ChannelConfig, MessageHandler};
@@ -242,8 +243,18 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
         self.distance
     }
 
-    pub fn direct_send(&self, message: TxMessage) -> Result<(), TxError> {
-        println!("Sending message: {:?}", message);
+    pub fn set_power_target(&mut self, power: u16) -> Result<(), TxError> {
+        let power: u16 = power * 4;
+        let message: TxMessage = AcknowledgedData::new(0, [
+            0x31,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            (power & 0xFF) as u8,
+            (power >> 8) as u8,
+        ]).into();
         self.tx.try_send(message)?;
         Ok(())
     }
