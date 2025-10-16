@@ -1,7 +1,64 @@
+mod datapages;
+mod display;
+
+pub use datapages::*;
+pub use display::*;
+
 use derive_new::new;
 use packed_struct::derive::PackedStruct;
 
+use crate::plus::common::msg_handler::StateError;
+
 pub const DEVICE_TYPE: u8 = 121;
+
+#[derive(Debug, Default)]
+pub enum Period {
+    #[default]
+    FourHz,
+    TwoHz,
+    OneHz,
+}
+
+impl From<Period> for u16 {
+    fn from(p: Period) -> u16 {
+        match p {
+            Period::FourHz => 8192,
+            Period::TwoHz => 16140,
+            Period::OneHz => 32280,
+        }
+    }
+}
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum MonitorTxDataPage {
+    MainDataPage(MainDataPage),
+}
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum DisplayTxDataPage {
+    // ManufacturerSpecific(ManufacturerSpecific),
+}
+
+#[derive(Debug, Clone)]
+pub enum Error {
+    BytePatternError(packed_struct::PackingError),
+    UnsupportedDataPage(u8),
+    PageAlreadyPending(),
+    NotAssociated(),
+    ConfigurationError(StateError),
+}
+
+impl From<packed_struct::PackingError> for Error {
+    fn from(err: packed_struct::PackingError) -> Self {
+        Self::BytePatternError(err)
+    }
+}
+
+impl From<StateError> for Error {
+    fn from(err: StateError) -> Self {
+        Self::ConfigurationError(err)
+    }
+}
 
 #[derive(PackedStruct, new, PartialEq, Copy, Clone, Debug)]
 #[packed_struct(endian = "lsb")]

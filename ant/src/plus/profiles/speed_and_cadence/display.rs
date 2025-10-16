@@ -6,9 +6,9 @@ use crate::messages::config::{
 use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig, TxMessageData};
 // use crate::plus::common::datapages::MANUFACTURER_SPECIFIC_RANGE;
 use crate::plus::common::msg_handler::{ChannelConfig, MessageHandler};
-use crate::plus::profiles::fitness_equipment_controls::{
-    DataPageNumbers, EquipmentType, Error, MainDataPage, MonitorTxDataPage, 
-    Period, PowerDataPage, DATA_PAGE_NUMBER_MASK, DEVICE_TYPE
+use crate::plus::profiles::speed_and_cadence::{
+    DataPageNumbers, Error, MainDataPage, MonitorTxDataPage, 
+    Period, DATA_PAGE_NUMBER_MASK, DEVICE_TYPE
 };
 use crate::plus::NETWORK_RF_FREQUENCY;
 
@@ -25,11 +25,6 @@ pub struct Display<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> {
     tx_datapage_callback: Option<fn() -> Option<TxMessageData>>,
     tx: T,
     rx: R,
-    equipment_type: Option<EquipmentType>,
-    virtual_speed: Option<u8>,
-    real_speed: Option<u8>,
-    elapsed_time: u16,
-    distance: u16,
 }
 
 pub struct DisplayConfig {
@@ -74,11 +69,6 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
             msg_handler: MessageHandler::new(&channel_config),
             tx,
             rx,
-            equipment_type: None,
-            virtual_speed: None,
-            real_speed: None,
-            elapsed_time: 0,
-            distance: 0,
         }
     }
 
@@ -129,40 +119,10 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
                 DataPageNumbers::MainDataPage => {
                     let page = MainDataPage::unpack(data)?;
 
-                    // Equipment Type
-                    self.equipment_type = Some(page.equiment_type.into());
-
-                    // Elapsed Time
-                    let old_elapsed_time = self.elapsed_time as u16 % 64;
-                    let mut elapsed_time = page.elapsed_time as u16 / 4;
-                    if elapsed_time != self.elapsed_time && old_elapsed_time > elapsed_time {
-                        elapsed_time += 64;
-                    }
-                    self.elapsed_time += elapsed_time - old_elapsed_time;
-
-                    // Distance
-                    if page.cap_state_bf & 0x04 > 0 {
-                        let old_distance = self.distance as u16 % 256;
-                        let mut distance = page.distance as u16;
-                        if distance != self.distance && old_distance > distance {
-                            distance += 256;
-                        }
-                        self.distance += distance - old_distance;
-                    }
-
-                    // Speed
-                    if page.cap_state_bf & 0x08 > 0 {
-                        self.virtual_speed = Some((page.speed / 1000) as u8);
-                        self.real_speed = None;
-                    } else {
-                        self.real_speed = Some((page.speed / 1000) as u8);
-                        self.virtual_speed = None;
-                    }
+                    // TODO: set specific data
 
                     MonitorTxDataPage::MainDataPage(page)
                 },
-                DataPageNumbers::PowerDataPage => 
-                    MonitorTxDataPage::PowerDataPage(PowerDataPage::unpack(data)?),
             };
             return Ok(parsed);
         }
@@ -220,26 +180,6 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
             }
         }
         Ok(())
-    }
-
-    pub fn get_equipment_type(&self) -> Option<EquipmentType> {
-        self.equipment_type
-    }
-
-    pub fn get_virtual_speed(&self) -> Option<u8> {
-        self.virtual_speed
-    }
-
-    pub fn get_real_speed(&self) -> Option<u8> {
-        self.real_speed
-    }
-
-    pub fn get_elapsed_time(&self) -> u16 {
-        self.elapsed_time
-    }
-
-    pub fn get_distance(&self) -> u16 {
-        self.distance
     }
 
     pub fn direct_send(&self, message: TxMessage) -> Result<(), TxError> {
