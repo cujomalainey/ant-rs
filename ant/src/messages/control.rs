@@ -116,6 +116,12 @@ impl TransmitableMessage for OpenRxScanMode {
     }
 }
 
+impl From<OpenRxScanMode> for TxMessage {
+    fn from(msg: OpenRxScanMode) -> TxMessage {
+        TxMessage::OpenRxScanMode(msg)
+    }
+}
+
 #[derive(PackedStruct, AntTx, new, Clone, Copy, Debug, Default, PartialEq)]
 #[packed_struct(bit_numbering = "msb0", endian = "lsb", size_bytes = "1")]
 pub struct SleepMessage {

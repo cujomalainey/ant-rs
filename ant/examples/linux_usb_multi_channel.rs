@@ -3,7 +3,7 @@ use ant::drivers::{is_ant_usb_device_from_device, UsbDriver};
 use ant::messages::channel::MessageCode;
 use ant::messages::config::SetNetworkKey;
 use ant::messages::{AntMessage, RxMessage, TxMessage};
-use ant::plus::profiles::{fitness_equipment_controls, speed_and_cadence};
+use ant::plus::profiles::{discovery, fitness_equipment_controls, speed_and_cadence};
 use ant::router::Router;
 use dialoguer::Select;
 use rusb::{Device, DeviceList};
@@ -82,74 +82,16 @@ fn main() -> std::io::Result<()> {
     .unwrap();
     let snk = SetNetworkKey::new(0, [0xB9, 0xA5, 0x21, 0xFB, 0xBD, 0x72, 0xC3, 0x45]);
     router.send(&snk).expect("failed to set network key");
-    // let chan = router
-    //     .add_channel(TxSender { sender: router_tx })
-    //     .expect("Add channel failed");
-    // let tacx_config = DisplayConfig {
-    //     device_number: 0,
-    //     device_number_extension: 0.into(),
-    //     channel: chan,
-    //     period: Period::FourHz,
-    //     ant_plus_key_index: 0,
-    // };
-    // let mut tacx = Display::new(
-    //     tacx_config,
-    //     TxSender { sender: channel_tx.clone() },
-    //     RxReceiver { receiver: channel_rx },
-    // );
-    // tacx.set_rx_message_callback(Some(|msg| {
-    //     match msg.message {
-    //         RxMessage::ChannelEvent(event) => match event.payload.message_code {
-    //             MessageCode::EventTransferTxCompleted => println!("Transfer TX completed"),
-    //             MessageCode::EventTransferTxFailed => println!("Transfer TX failed"),
-    //             _ => {}
-    //         },
-    //         RxMessage::BroadcastData(x) =>
-    //             println!("17: {:x?}", x.payload.channel_number),
-    //         _ => {}
-    //     }
-    // }));
 
-    // tacx.open();
-
-    // let (router_tx, channel_rx) = channel(8);
-    // let chan = router
-    //     .add_channel(TxSender { sender: router_tx })
-    //     .expect("Add channel failed");
-    // let tacx_config = DisplayConfig {
-    //     device_number: 0,
-    //     device_number_extension: 0.into(),
-    //     channel: chan,
-    //     period: Period::FourHz,
-    //     ant_plus_key_index: 0,
-    // };
-    // let mut tacx = Display::new(
-    //     tacx_config,
-    //     TxSender { sender: channel_tx },
-    //     RxReceiver { receiver: channel_rx },
-    // );
-    // tacx.set_rx_message_callback(Some(|msg| {
-    //     match msg.message {
-    //         RxMessage::ChannelEvent(event) => match event.payload.message_code {
-    //             MessageCode::EventTransferTxCompleted => println!("Transfer TX completed"),
-    //             MessageCode::EventTransferTxFailed => println!("Transfer TX failed"),
-    //             _ => {}
-    //         },
-    //         RxMessage::BroadcastData(x) =>
-    //             println!("17: {:x?}", x.payload.channel_number),
-    //         _ => {}
-    //     }
-    // }));
-
-    // tacx.open();
-
-    let mut tacx = setup_fec_channel(&mut router, channel_tx.clone());
-    let mut tacx2 = setup_sac_channel(&mut router, channel_tx.clone());
+    // let mut tacx = setup_fec_channel(&mut router, channel_tx.clone());
+    // let mut tacx2 = setup_sac_channel(&mut router, channel_tx.clone());
+    let mut discovery = setup_discovery_channel(&mut router, channel_tx.clone());
 
     loop {
         router.process().unwrap();
-        tacx.process().unwrap();
-        tacx2.process().unwrap();
+        // tacx.process().unwrap();
+        // tacx2.process().unwrap();
+        discovery.process().unwrap();
     }
 }
 
@@ -220,6 +162,41 @@ fn setup_sac_channel(
             },
             RxMessage::BroadcastData(x) =>
                 println!("11: {:x?}", x.payload.channel_number),
+            _ => {}
+        }
+    }));
+
+    tacx.open();
+
+    tacx
+}
+
+fn setup_discovery_channel(
+    router: &mut Router<rusb::Error, UsbDriver<rusb::GlobalContext>, 
+    TxSender<AntMessage>, RxReceiver<TxMessage>>, channel_tx: Sender<TxMessage>
+) -> discovery::Display<TxSender<TxMessage>, RxReceiver<AntMessage>> {
+    let (router_tx, channel_rx) = channel(8);
+    let chan = router
+        .add_channel(TxSender { sender: router_tx })
+        .expect("Add channel failed");
+    let tacx_config = discovery::DisplayConfig {
+        channel: chan,
+        ant_plus_key_index: 0,
+    };
+    let mut tacx = discovery::Display::new(
+        tacx_config,
+        TxSender { sender: channel_tx },
+        RxReceiver { receiver: channel_rx },
+    );
+    tacx.set_rx_message_callback(Some(|msg| {
+        match msg.message {
+            RxMessage::ChannelEvent(event) => match event.payload.message_code {
+                MessageCode::EventTransferTxCompleted => println!("Transfer TX completed"),
+                MessageCode::EventTransferTxFailed => println!("Transfer TX failed"),
+                _ => {}
+            },
+            RxMessage::BroadcastData(x) =>
+                println!("Discovery: {:#?}", x),
             _ => {}
         }
     }));

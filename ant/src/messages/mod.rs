@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::messages::config::{
+use crate::messages::{config::{
     AddChannelIdToList, AddEncryptionIdToList, AssignChannel, ChannelId, ChannelPeriod,
     ChannelRfFrequency, ChannelSearchPriority, ChannelSearchSharing, ConfigEncryptionIdList,
     ConfigIdList, ConfigureAdvancedBurst, ConfigureEventBuffer, ConfigureEventFilter,
@@ -17,7 +17,7 @@ use crate::messages::config::{
     SetEncryptionInfoEncryptionId, SetEncryptionInfoRandomSeed,
     SetEncryptionInfoUserInformationString, SetEncryptionKey, SetNetworkKey,
     SetSelectiveDataUpdateMask, StoreEncryptionKeyInNvm, TransmitPower, UnAssignChannel,
-};
+}, control::OpenRxScanMode};
 use channel::{ChannelEvent, ChannelResponse};
 use control::{CloseChannel, OpenChannel, RequestMessage, ResetSystem, SleepMessage};
 use data::{
@@ -124,7 +124,7 @@ pub enum TxMessage {
     OpenChannel(OpenChannel),
     CloseChannel(CloseChannel),
     RequestMessage(RequestMessage),
-    // OpenRxScanMode(OpenRxScanMode),
+    OpenRxScanMode(OpenRxScanMode),
     SleepMessage(SleepMessage),
     BroadcastData(BroadcastData),
     AcknowledgedData(AcknowledgedData),
@@ -188,7 +188,7 @@ impl TransmitableMessage for TxMessage {
             TxMessage::OpenChannel(oc) => oc.serialize_message(buf),
             TxMessage::CloseChannel(cc) => cc.serialize_message(buf),
             TxMessage::RequestMessage(rm) => rm.serialize_message(buf),
-            // TxMessage::OpenRxScanMode(or) => or.serialize_message(buf),
+            TxMessage::OpenRxScanMode(or) => or.serialize_message(buf),
             TxMessage::SleepMessage(sm) => sm.serialize_message(buf),
             TxMessage::BroadcastData(bd) => bd.serialize_message(buf),
             TxMessage::AcknowledgedData(ad) => ad.serialize_message(buf),
@@ -245,7 +245,7 @@ impl TransmitableMessage for TxMessage {
             TxMessage::OpenChannel(oc) => oc.get_tx_msg_id(),
             TxMessage::CloseChannel(cc) => cc.get_tx_msg_id(),
             TxMessage::RequestMessage(rm) => rm.get_tx_msg_id(),
-            // TODO TxMessage::OpenRxScanMode(or) => or.serialize_message(buf),
+            TxMessage::OpenRxScanMode(or) => or.get_tx_msg_id(),
             TxMessage::SleepMessage(sm) => sm.get_tx_msg_id(),
             TxMessage::BroadcastData(bd) => bd.get_tx_msg_id(),
             TxMessage::AcknowledgedData(ad) => ad.get_tx_msg_id(),

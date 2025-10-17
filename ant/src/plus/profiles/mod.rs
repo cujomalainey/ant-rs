@@ -9,3 +9,4 @@
 pub mod heart_rate;
 pub mod speed_and_cadence;
 pub mod fitness_equipment_controls;
+pub mod discovery;

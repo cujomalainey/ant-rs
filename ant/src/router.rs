@@ -227,6 +227,7 @@ impl<E, D: Driver<E>, T: TxHandler<AntMessage>, R: RxHandler<TxMessage>> Router<
             self.handle_message(msg)?;
         }
         while let Ok(msg) = self.receiver.try_recv() {
+            println!("Router sending message: {:?}", msg);
             self.driver.send_message(&msg)?;
         }
         Ok(())
