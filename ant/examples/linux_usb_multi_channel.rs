@@ -1,7 +1,13 @@
+use std::cell::OnceCell;
+use std::sync::OnceLock;
+use std::time::Instant;
+
 use ant::channel::{RxError, RxHandler, TxError, TxHandler};
 use ant::drivers::{is_ant_usb_device_from_device, UsbDriver};
 use ant::messages::channel::MessageCode;
-use ant::messages::config::SetNetworkKey;
+use ant::messages::config::{LibConfig, SetNetworkKey};
+use ant::messages::data::BroadcastData;
+use ant::messages::test_mode::CwTest;
 use ant::messages::{AntMessage, RxMessage, TxMessage};
 use ant::plus::profiles::{discovery, fitness_equipment_controls, speed_and_cadence};
 use ant::router::Router;
@@ -83,15 +89,28 @@ fn main() -> std::io::Result<()> {
     let snk = SetNetworkKey::new(0, [0xB9, 0xA5, 0x21, 0xFB, 0xBD, 0x72, 0xC3, 0x45]);
     router.send(&snk).expect("failed to set network key");
 
-    // let mut tacx = setup_fec_channel(&mut router, channel_tx.clone());
-    // let mut tacx2 = setup_sac_channel(&mut router, channel_tx.clone());
     let mut discovery = setup_discovery_channel(&mut router, channel_tx.clone());
+    let mut tacx: Option<fitness_equipment_controls::Display<TxSender<TxMessage>, RxReceiver<AntMessage>>> = None;
+    // let mut tacx2 = setup_sac_channel(&mut router, channel_tx.clone());
+
+    router.send(&LibConfig::new(true, false, false)).unwrap();
+
+    let mut last_time = Instant::now();
+    let mut started = false;
 
     loop {
-        router.process().unwrap();
-        // tacx.process().unwrap();
-        // tacx2.process().unwrap();
+        let _ = router.process();
         discovery.process().unwrap();
+        if let Some(tacx) = &mut tacx {
+            tacx.process().unwrap();
+        }
+        // tacx2.process().unwrap();
+
+        let elapsed = last_time.elapsed();
+        if elapsed.as_secs() > 10 && !started {
+            tacx = Some(setup_fec_channel(&mut router, channel_tx.clone()));
+            started = true;
+        }
     }
 }
 
@@ -104,7 +123,7 @@ fn setup_fec_channel(
         .add_channel(TxSender { sender: router_tx })
         .expect("Add channel failed");
     let tacx_config = fitness_equipment_controls::DisplayConfig {
-        device_number: 0,
+        device_number: 9609,
         device_number_extension: 0.into(),
         channel: chan,
         period: fitness_equipment_controls::Period::FourHz,
@@ -116,16 +135,17 @@ fn setup_fec_channel(
         RxReceiver { receiver: channel_rx },
     );
     tacx.set_rx_message_callback(Some(|msg| {
-        match msg.message {
-            RxMessage::ChannelEvent(event) => match event.payload.message_code {
-                MessageCode::EventTransferTxCompleted => println!("Transfer TX completed"),
-                MessageCode::EventTransferTxFailed => println!("Transfer TX failed"),
-                _ => {}
-            },
-            RxMessage::BroadcastData(x) =>
-                println!("17: {:x?}", x.payload.channel_number),
-            _ => {}
-        }
+        println!("{:#?}", msg);
+        // match msg.message {
+        //     RxMessage::ChannelEvent(event) => match event.payload.message_code {
+        //         MessageCode::EventTransferTxCompleted => println!("Transfer TX completed"),
+        //         MessageCode::EventTransferTxFailed => println!("Transfer TX failed"),
+        //         _ => {}
+        //     },
+        //     RxMessage::BroadcastData(x) =>
+        //         println!("17: {:x?}", x.payload.channel_number),
+        //     _ => {}
+        // }
     }));
 
     tacx.open();
@@ -189,14 +209,22 @@ fn setup_discovery_channel(
         RxReceiver { receiver: channel_rx },
     );
     tacx.set_rx_message_callback(Some(|msg| {
+        // println!("{:#?}", msg);
         match msg.message {
             RxMessage::ChannelEvent(event) => match event.payload.message_code {
                 MessageCode::EventTransferTxCompleted => println!("Transfer TX completed"),
                 MessageCode::EventTransferTxFailed => println!("Transfer TX failed"),
                 _ => {}
             },
-            RxMessage::BroadcastData(x) =>
-                println!("Discovery: {:#?}", x),
+            RxMessage::BroadcastData(x) => {
+                if x.payload.data[0] == 80 || x.payload.data[0] == 81 {
+                    println!("{:#?}", x);
+                } else {
+                    println!("discovered");
+                }
+            },
+            RxMessage::SerialNumber(x) => 
+                println!("Serial Number: {:#?}", x),
             _ => {}
         }
     }));

@@ -1,9 +1,9 @@
 use crate::channel::{duration_to_search_timeout};
 use crate::channel::{ChanError, RxHandler, TxHandler};
 use crate::messages::config::{
-    ChannelType, LibConfig, TransmissionType
+    ChannelType, TransmissionType
 };
-use crate::messages::control::{CloseChannel, OpenRxScanMode};
+use crate::messages::control::{RequestMessage, RequestableMessageId};
 use crate::messages::{AntMessage, TxMessage, TxMessageChannelConfig, TxMessageData};
 // use crate::plus::common::datapages::MANUFACTURER_SPECIFIC_RANGE;
 use crate::plus::common::msg_handler::{ChannelConfig, MessageHandler};
@@ -22,7 +22,6 @@ pub struct Display<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> {
     tx_datapage_callback: Option<fn() -> Option<TxMessageData>>,
     tx: T,
     rx: R,
-    is_scanning: bool,
 }
 
 pub struct DisplayConfig {
@@ -55,7 +54,6 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
             msg_handler: MessageHandler::new(&channel_config),
             tx,
             rx,
-            is_scanning: false,
         }
     }
 
@@ -65,7 +63,6 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
 
     pub fn close(&mut self) {
         self.msg_handler.close();
-        self.is_scanning = false;
     }
 
     pub fn get_device_id(&self) -> u16 {
@@ -93,14 +90,7 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
     }
 
     pub fn process(&mut self) -> Result<(), ChanError> {
-        if self.msg_handler.is_tx_ready() && !self.is_scanning {  // Start scanning instead of opening channel
-            self.tx.try_send(CloseChannel::new(self.msg_handler.get_channel()).into()).unwrap();
-            self.tx.try_send(LibConfig::new(true, false, false).into()).unwrap();
-            self.tx.try_send(OpenRxScanMode::new(Some(false)).into()).unwrap();
-            self.is_scanning = true;
-        }
-
-        // TODO handle closed channel
+                // TODO handle closed channel
         while let Ok(msg) = self.rx.try_recv() {
             if let Some(f) = self.rx_message_callback {
                 f(&msg);
