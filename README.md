@@ -1,6 +1,4 @@
 # Status
-This repository is in maintenance mode! Garmin has signaled the end of the ANT/ANT+ ecosystem, therefore I will not be adding any new features, feel free to send PRs and I will review and integrate.
-
 see `development` branch for latest version.
 
 # ant-rs
