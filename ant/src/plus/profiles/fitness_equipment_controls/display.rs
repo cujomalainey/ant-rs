@@ -245,7 +245,7 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
 
     pub fn set_power_target(&mut self, power: u16) -> Result<(), TxError> {
         let power: u16 = power * 4;
-        let message: TxMessage = AcknowledgedData::new(self.msg_handler.get_channel(), [
+        let mut message: TxMessageData = AcknowledgedData::new(0, [
             0x31,
             0x00,
             0x00,
@@ -255,7 +255,8 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
             (power & 0xFF) as u8,
             (power >> 8) as u8,
         ]).into();
-        self.tx.try_send(message)?;
+        message.set_channel(self.msg_handler.get_channel());
+        self.tx.try_send(message.into())?;
         Ok(())
     }
 }
