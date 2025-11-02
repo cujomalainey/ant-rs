@@ -8,7 +8,7 @@ use crate::messages::{AntMessage, RxMessage, TxMessage, TxMessageChannelConfig, 
 // use crate::plus::common::datapages::MANUFACTURER_SPECIFIC_RANGE;
 use crate::plus::common::msg_handler::{ChannelConfig, MessageHandler};
 use crate::plus::profiles::fitness_equipment_controls::{
-    DataPageNumbers, EquipmentType, Error, MainDataPage, MonitorTxDataPage, 
+    DataPageNumbers, EquipmentType, Error, MainDataPage, MonitorTxDataPage,
     Period, PowerDataPage, DATA_PAGE_NUMBER_MASK, DEVICE_TYPE
 };
 use crate::plus::NETWORK_RF_FREQUENCY;
@@ -162,7 +162,7 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
 
                     MonitorTxDataPage::MainDataPage(page)
                 },
-                DataPageNumbers::PowerDataPage => 
+                DataPageNumbers::PowerDataPage =>
                     MonitorTxDataPage::PowerDataPage(PowerDataPage::unpack(data)?),
             };
             return Ok(parsed);
@@ -245,7 +245,7 @@ impl<T: TxHandler<TxMessage>, R: RxHandler<AntMessage>> Display<T, R> {
 
     pub fn set_power_target(&mut self, power: u16) -> Result<(), TxError> {
         let power: u16 = power * 4;
-        let message: TxMessage = AcknowledgedData::new(0, [
+        let message: TxMessage = AcknowledgedData::new(self.msg_handler.get_channel(), [
             0x31,
             0x00,
             0x00,
